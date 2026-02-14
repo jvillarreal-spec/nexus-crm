@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
                         channel: 'telegram',
                         status: 'open',
                     })
-                    .select('id')
+                    .select('id, unread_count')
                     .single();
 
                 if (createConvError) console.error('Error creating conversation:', createConvError);
