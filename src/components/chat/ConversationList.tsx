@@ -13,12 +13,27 @@ interface ConversationListProps {
 }
 
 export default function ConversationList({ onSelect, selectedId }: ConversationListProps) {
+    const [conversations, setConversations] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const supabase = createClient();
 
     useEffect(() => {
         fetchConversations();
-        // ...
+
+        // Subscribe to changes in conversations
+        const channel = supabase
+            .channel('conversations-channel')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'conversations' },
+                () => fetchConversations()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     async function fetchConversations() {
