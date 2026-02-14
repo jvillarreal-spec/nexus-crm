@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
             // b. Ensure Conversation Exists
             let { data: conversation, error: convError } = await supabase
                 .from('conversations')
-                .select('id')
+                .select('id, unread_count')
                 .eq('contact_id', contact.id)
                 .eq('status', 'open')
                 .maybeSingle();
@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
                     // d. Update Conversation Metadata
                     await supabase.from('conversations').update({
                         last_message_at: new Date().toISOString(),
+                        unread_count: (conversation.unread_count || 0) + 1
                     }).eq('id', conversation.id);
                 }
             }

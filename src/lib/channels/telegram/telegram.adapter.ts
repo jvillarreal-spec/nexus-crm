@@ -1,10 +1,13 @@
 
 import { ChannelAdapter, UnifiedMessage, SendOptions, MediaPayload, MenuPayload } from '../channel.interface';
 
-const TELEGRAM_API_BASE = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
 export class TelegramAdapter implements ChannelAdapter {
     readonly channelName = 'telegram';
+
+    private getApiBase() {
+        return `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+    }
 
     /**
      * Parse incoming webhook payload from Telegram
@@ -134,7 +137,7 @@ export class TelegramAdapter implements ChannelAdapter {
      * Helper to call Telegram API
      */
     private async callApi(method: string, body: any): Promise<any> {
-        const response = await fetch(`${TELEGRAM_API_BASE}/${method}`, {
+        const response = await fetch(`${this.getApiBase()}/${method}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
