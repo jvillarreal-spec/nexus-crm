@@ -70,9 +70,10 @@ export default function ChatContainer() {
                         <div className="flex-1 overflow-hidden relative">
                             <MessageList conversationId={selectedConversationId} />
                         </div>
-
                         {/* Input */}
-                        <ChatInput conversationId={selectedConversationId} contactId={activeContact?.id} />
+                        {selectedConversationId && activeContact?.id && (
+                            <ChatInput conversationId={selectedConversationId} contactId={activeContact.id} />
+                        )}
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-[#8b8fa3] space-y-4">

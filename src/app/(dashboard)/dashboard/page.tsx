@@ -1,6 +1,8 @@
 
 import { Users, MessageSquare, Clock, TrendingUp } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export default function Dashboard() {
     return (
         <div className="space-y-6">
