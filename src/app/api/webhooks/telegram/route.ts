@@ -5,11 +5,12 @@ import { BotLogic } from '@/lib/bot/bot.logic';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
+    console.log('--- Telegram Webhook received ---');
     try {
         // 1. Validate Secret Token
         const secretToken = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
         if (secretToken !== process.env.TELEGRAM_WEBHOOK_SECRET) {
-            console.error('Invalid Telegram Secret Token');
+            console.error('Unauthorized: Invalid Secret Token');
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -19,27 +20,35 @@ export async function POST(request: NextRequest) {
         const unifiedMessage = adapter.parseIncoming(rawUpdate);
 
         if (!unifiedMessage) {
-            // Not a message we care about (e.g. edited_message), just acknowledge
+            console.log('Ignored update (not a supported message type)');
             return NextResponse.json({ ok: true });
         }
 
-        // 3. Process Logic
+        console.log(`Processing message from ${unifiedMessage.senderName} (${unifiedMessage.chatId})`);
+
+        // 3. Process Bot Logic (Asynchronous response to user)
         const bot = new BotLogic(adapter);
         await bot.handleIncomingMessage(unifiedMessage);
 
-        // 4. Store in DB (Supabase)
+        // 4. Store in DB (Supabase Admin)
+        console.log('Storing in database...');
         const supabase = createAdminClient();
 
         // a. Ensure Contact Exists
-        let { data: contact } = await supabase
+        let { data: contact, error: contactError } = await supabase
             .from('contacts')
             .select('id')
             .eq('channel', 'telegram')
             .eq('channel_id', unifiedMessage.chatId)
-            .single();
+            .maybeSingle(); // maybeSingle returns null instead of throwing if not found
+
+        if (contactError) {
+            console.error('Error fetching contact:', contactError);
+        }
 
         if (!contact) {
-            const { data: newContact, error } = await supabase
+            console.log('Creating new contact...');
+            const { data: newContact, error: insertError } = await supabase
                 .from('contacts')
                 .insert({
                     channel: 'telegram',
@@ -50,24 +59,27 @@ export async function POST(request: NextRequest) {
                 .select('id')
                 .single();
 
-            if (error) {
-                console.error('Error creating contact:', error);
-                // Continue processing even if contact creation fails? Ideally we need it.
+            if (insertError) {
+                console.error('Error creating contact:', insertError);
             }
             contact = newContact;
         }
 
         if (contact) {
+            console.log(`Contact ID: ${contact.id}. Finding/Creating conversation...`);
             // b. Ensure Conversation Exists
-            let { data: conversation } = await supabase
+            let { data: conversation, error: convError } = await supabase
                 .from('conversations')
                 .select('id')
                 .eq('contact_id', contact.id)
                 .eq('status', 'open')
-                .single();
+                .maybeSingle();
+
+            if (convError) console.error('Error fetching conversation:', convError);
 
             if (!conversation) {
-                const { data: newConversation } = await supabase
+                console.log('Creating new conversation...');
+                const { data: newConversation, error: createConvError } = await supabase
                     .from('conversations')
                     .insert({
                         contact_id: contact.id,
@@ -76,12 +88,15 @@ export async function POST(request: NextRequest) {
                     })
                     .select('id')
                     .single();
+
+                if (createConvError) console.error('Error creating conversation:', createConvError);
                 conversation = newConversation;
             }
 
             // c. Create Message
             if (conversation) {
-                await supabase.from('messages').insert({
+                console.log(`Conversation ID: ${conversation.id}. Saving message...`);
+                const { error: msgError } = await supabase.from('messages').insert({
                     conversation_id: conversation.id,
                     channel_message_id: unifiedMessage.channelMessageId,
                     direction: 'inbound',
@@ -91,18 +106,23 @@ export async function POST(request: NextRequest) {
                     media_url: unifiedMessage.mediaUrl,
                 });
 
-                // d. Update Conversation Metadata
-                await supabase.from('conversations').update({
-                    last_message_at: new Date().toISOString(),
-                    unread_count: 1 // Increment logic should be atomic or handle read status
-                }).eq('id', conversation.id);
+                if (msgError) {
+                    console.error('Error saving message:', msgError);
+                } else {
+                    console.log('Message saved successfully');
+
+                    // d. Update Conversation Metadata
+                    await supabase.from('conversations').update({
+                        last_message_at: new Date().toISOString(),
+                    }).eq('id', conversation.id);
+                }
             }
         }
 
         return NextResponse.json({ ok: true });
-    } catch (error) {
-        console.error('Error processing Telegram webhook:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('CRITICAL: Webhook Handler Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
     }
 }
 
