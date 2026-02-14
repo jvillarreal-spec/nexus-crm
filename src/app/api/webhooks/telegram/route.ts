@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
 import { BotLogic } from '@/lib/bot/bot.logic';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
     try {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         await bot.handleIncomingMessage(unifiedMessage);
 
         // 4. Store in DB (Supabase)
-        const supabase = await createClient();
+        const supabase = createAdminClient();
 
         // a. Ensure Contact Exists
         let { data: contact } = await supabase
