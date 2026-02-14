@@ -13,29 +13,16 @@ interface ConversationListProps {
 }
 
 export default function ConversationList({ onSelect, selectedId }: ConversationListProps) {
-    const [conversations, setConversations] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const supabase = createClient();
 
     useEffect(() => {
         fetchConversations();
-
-        // Subscribe to changes in conversations
-        const channel = supabase
-            .channel('conversations-channel')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'conversations' },
-                () => fetchConversations()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        // ...
     }, []);
 
     async function fetchConversations() {
+        setError(null);
         const { data, error } = await supabase
             .from('conversations')
             .select('*, contacts(*)')
@@ -43,6 +30,7 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
 
         if (error) {
             console.error('Error fetching conversations:', error);
+            setError(error.message);
         } else {
             setConversations(data || []);
         }
@@ -61,6 +49,21 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
                         </div>
                     </div>
                 ))}
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-8 text-center">
+                <p className="text-red-500 text-sm mb-2">Error cargando chats</p>
+                <p className="text-[#8b8fa3] text-xs">{error}</p>
+                <button
+                    onClick={() => fetchConversations()}
+                    className="mt-4 text-[#2AABEE] text-xs font-medium hover:underline"
+                >
+                    Reintentar
+                </button>
             </div>
         );
     }
