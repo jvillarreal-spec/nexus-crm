@@ -255,14 +255,17 @@ export default function ContactsPage() {
                                         <Tag size={16} />
                                         <h3 className="text-xs font-bold uppercase tracking-wider">Etiquetas</h3>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedContact.tags?.map((tag: string) => (
-                                            <span key={tag} className="px-3 py-1 bg-[#232732] border border-[#2a2e3d] rounded-full text-xs text-[#e8eaed]">
-                                                {tag}
-                                            </span>
-                                        )) || <span className="text-sm text-[#8b8fa3]">Sin etiquetas</span>}
-                                    </div>
                                 </div>
+
+                                {/* Debug Section */}
+                                {selectedContact.metadata?.debug_last_ai_raw && (
+                                    <div className="space-y-3 p-4 bg-red-900/10 border border-red-500/20 rounded-xl">
+                                        <h3 className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Debug: Raw AI Response</h3>
+                                        <pre className="text-[10px] text-red-300/70 overflow-x-auto whitespace-pre-wrap">
+                                            {JSON.stringify(selectedContact.metadata.debug_last_ai_raw, null, 2)}
+                                        </pre>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Footer / Actions */}
