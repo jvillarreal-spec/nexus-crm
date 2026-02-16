@@ -47,7 +47,9 @@ export async function POST(request: NextRequest) {
             console.error('Error fetching contact:', contactError);
         }
 
-        if (!contact) {
+        let currentContact = contact;
+
+        if (!currentContact) {
             console.log('Creating new contact...');
             const { data: newContact, error: insertError } = await supabase
                 .from('contacts')
@@ -57,17 +59,17 @@ export async function POST(request: NextRequest) {
                     first_name: unifiedMessage.senderName,
                     username: unifiedMessage.senderUsername,
                 })
-                .select('id')
+                .select('id, tags, metadata, first_name, last_name, email')
                 .single();
 
             if (insertError) {
                 console.error('Error creating contact:', insertError);
             }
-            contact = newContact;
+            currentContact = newContact;
         }
 
-        if (contact) {
-            console.log(`Contact ID: ${contact.id}. Finding/Creating conversation...`);
+        if (currentContact) {
+            console.log(`Contact ID: ${currentContact.id}. Finding/Creating conversation...`);
             // b. Ensure Conversation Exists
             let { data: conversation, error: convError } = await supabase
                 .from('conversations')
