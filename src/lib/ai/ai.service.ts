@@ -13,7 +13,10 @@ export interface AIAnalysisResult {
         phone?: string;
         company?: string;
         budget?: string;
-    }
+        summary?: string;
+    };
+    sentiment: 'positive' | 'neutral' | 'negative';
+}
 
 export class AIService {
     /**
