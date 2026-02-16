@@ -255,8 +255,14 @@ export default function ContactsPage() {
                                         <Tag size={16} />
                                         <h3 className="text-xs font-bold uppercase tracking-wider">Etiquetas</h3>
                                     </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedContact.tags?.map((tag: string) => (
+                                            <span key={tag} className="px-3 py-1 bg-[#232732] border border-[#2a2e3d] rounded-full text-xs text-[#e8eaed]">
+                                                {tag}
+                                            </span>
+                                        )) || <span className="text-sm text-[#8b8fa3]">Sin etiquetas</span>}
+                                    </div>
                                 </div>
-                                )}
 
                                 {/* Error Status */}
                                 {selectedContact.metadata?.ai_error && (
