@@ -27,10 +27,10 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Switching to EXPLICIT versioned names on the STABLE v1 API.
-        // This avoids the 'gemini-3-pro' mapping issue seen with aliases.
+        // Using explicit versions on v1beta. 
+        // Some 'special' projects only respond to these specific combinations.
         const primaryModel = "gemini-1.5-flash";
-        const fallbackModel = "gemini-1.0-pro";
+        const fallbackModel = "gemini-pro-latest";
 
         return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
     }
@@ -76,9 +76,9 @@ export class AIService {
         `;
 
         try {
-            console.log(`AI: Requesting analysis from ${modelName} (v1)...`);
-            // Explicitly use v1 stable endpoint to avoid experimental mappings
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
+            console.log(`AI: Requesting analysis from ${modelName} (v1beta)...`);
+            // v1beta often has more flexible mapping for complex projects
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
@@ -89,8 +89,8 @@ export class AIService {
             console.warn(`AI: Primary model ${modelName} failed. Reason: ${error.message}`);
 
             try {
-                console.log(`AI: Attempting fallback to ${fallbackName} (v1)...`);
-                const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1" });
+                console.log(`AI: Attempting fallback to ${fallbackName} (v1beta)...`);
+                const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
                 const result = await fallbackModel.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
@@ -98,9 +98,8 @@ export class AIService {
                 const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                 return JSON.parse(jsonText) as AIAnalysisResult;
             } catch (fallbackError: any) {
-                // If it's a 429 Limit 0, provide the recovery hint
                 if (fallbackError.message.includes('429') && fallbackError.message.includes('limit: 0')) {
-                    throw new Error(`[QUOTA_EXHAUSTED] Tu proyecto de Google no tiene cuota gratuita habilitada (Limit: 0). Por favor revisa la Guía de Recuperación en el CRM.`);
+                    throw new Error(`[QUOTA_EXHAUSTED] Tu proyecto 'EXCLUSIVO' no tiene cuota gratuita. Por favor, crea una LLAVE NUEVA en un PROYECTO NUEVO de AI Studio.`);
                 }
                 throw new Error(`[AI_FAILURE] Primary (${modelName}) & Fallback (${fallbackName}) failed. Last error: ${fallbackError.message}`);
             }
