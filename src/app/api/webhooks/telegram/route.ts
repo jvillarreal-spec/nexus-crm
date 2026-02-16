@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
             let { data: conversation, error: convError } = await supabase
                 .from('conversations')
                 .select('id, unread_count')
-                .eq('contact_id', contact.id)
+                .eq('contact_id', currentContact.id)
                 .eq('status', 'open')
                 .maybeSingle();
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
                 const { data: newConversation, error: createConvError } = await supabase
                     .from('conversations')
                     .insert({
-                        contact_id: contact.id,
+                        contact_id: currentContact.id,
                         channel: 'telegram',
                         status: 'open',
                     })
@@ -122,34 +122,31 @@ export async function POST(request: NextRequest) {
 
                     // e. AI Enrichment (Asynchronous)
                     const ai = new AIService();
-                    ai.analyzeMessage(unifiedMessage.body, contact).then(async (analysis) => {
+                    const contactToAnalyze = currentContact; // Capture for the closure
+                    ai.analyzeMessage(unifiedMessage.body, contactToAnalyze).then(async (analysis) => {
                         if (analysis) {
                             console.log('AI Analysis result:', analysis);
                             const updateData: any = {};
 
                             // Combine existing tags with new AI tags (unique)
-                            const currentTags = contact.tags || [];
+                            const currentTags = contactToAnalyze.tags || [];
                             updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
 
                             // Map extracted data to contact fields
                             if (analysis.extracted_data.first_name) updateData.first_name = analysis.extracted_data.first_name;
                             if (analysis.extracted_data.last_name) updateData.last_name = analysis.extracted_data.last_name;
                             if (analysis.extracted_data.email) updateData.email = analysis.extracted_data.email;
-                            if (analysis.extracted_data.company) {
-                                updateData.metadata = {
-                                    ...(contact.metadata || {}),
-                                    company: analysis.extracted_data.company,
-                                    ai_summary: analysis.extracted_data.summary
-                                };
-                            }
-                            if (analysis.extracted_data.budget) {
-                                updateData.metadata = {
-                                    ...(updateData.metadata || contact.metadata || {}),
-                                    estimated_budget: analysis.extracted_data.budget
-                                };
-                            }
 
-                            await supabase.from('contacts').update(updateData).eq('id', contact.id);
+                            const existingMetadata = contactToAnalyze.metadata || {};
+                            updateData.metadata = {
+                                ...existingMetadata,
+                                ...(analysis.extracted_data.company ? { company: analysis.extracted_data.company } : {}),
+                                ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
+                                ai_summary: analysis.extracted_data.summary,
+                                last_analysis_at: new Date().toISOString()
+                            };
+
+                            await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
                             console.log('Contact enriched by AI');
                         }
                     }).catch(err => console.error('AI Enrichment failed:', err));
