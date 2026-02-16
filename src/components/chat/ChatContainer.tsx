@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ConversationList from './ConversationList';
+import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { createClient } from '@/lib/supabase/client';
 import { MessageSquare } from 'lucide-react';
