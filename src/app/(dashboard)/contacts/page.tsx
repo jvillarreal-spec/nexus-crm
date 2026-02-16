@@ -17,6 +17,23 @@ export default function ContactsPage() {
 
     useEffect(() => {
         fetchContacts();
+
+        // Subscribe to real-time updates
+        const channel = supabase
+            .channel('contacts-all')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'contacts'
+            }, () => {
+                console.log('Contacts update detected, refetching...');
+                fetchContacts();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     async function fetchContacts() {
