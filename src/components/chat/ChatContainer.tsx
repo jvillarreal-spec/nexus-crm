@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { MessageSquare } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import ConversationList from './ConversationList';
+import MessageList from './MessageList';
+import ChatInput from './ChatInput';
 import { SalesCoach } from './SalesCoach';
 
 export default function ChatContainer() {
@@ -28,7 +34,7 @@ export default function ChatContainer() {
                 schema: 'public',
                 table: 'contacts',
                 filter: `id=eq.${activeContact.id}`
-            }, (payload) => {
+            }, (payload: any) => {
                 setActiveContact(payload.new);
             })
             .subscribe();
