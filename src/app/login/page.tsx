@@ -41,13 +41,6 @@ export default function LoginPage() {
                     },
                 });
                 if (error) throw error;
-
-                // Si el registro es exitoso pero no hay sesión (ej: requiere confirmación de email)
-                if (data.user && !data.session) {
-                    setError('Revisa tu correo para confirmar tu cuenta');
-                    setLoading(false);
-                    return;
-                }
             }
 
             router.push('/dashboard');
@@ -71,8 +64,8 @@ export default function LoginPage() {
 
                 {error && (
                     <div className={`mb-4 p-3 rounded-lg text-sm border ${error.includes('correo')
-                            ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                            : 'bg-red-500/10 border-red-500/20 text-red-500'
+                        ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                        : 'bg-red-500/10 border-red-500/20 text-red-500'
                         }`}>
                         {error}
                     </div>
