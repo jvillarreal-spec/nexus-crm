@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
                             if (analysis.extracted_data.first_name) updateData.first_name = analysis.extracted_data.first_name;
                             if (analysis.extracted_data.last_name) updateData.last_name = analysis.extracted_data.last_name;
                             if (analysis.extracted_data.email) updateData.email = analysis.extracted_data.email;
+                            if (analysis.extracted_data.phone) updateData.phone = analysis.extracted_data.phone;
 
                             const existingMetadata = contactToAnalyze.metadata || {};
                             updateData.metadata = {
