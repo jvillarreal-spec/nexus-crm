@@ -13,12 +13,7 @@ export interface AIAnalysisResult {
         phone?: string;
         company?: string;
         budget?: string;
-        summary?: string;
-    };
-    sentiment: 'positive' | 'neutral' | 'negative';
-}
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
+    }
 
 export class AIService {
     /**
