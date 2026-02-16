@@ -125,23 +125,23 @@ export async function POST(request: NextRequest) {
                         }).eq('id', currentContact.id)
                     ]);
 
-                    // e. AI Enrichment (Asynchronous)
-                    const ai = new AIService();
-                    const contactToAnalyze = currentContact; // Capture for the closure
-                    ai.analyzeMessage(unifiedMessage.body, contactToAnalyze).then(async (analysis) => {
+                    // e. AI Enrichment (Awaited to ensure completion in Serverless)
+                    try {
+                        const ai = new AIService();
+                        const contactToAnalyze = currentContact;
+                        const analysis = await ai.analyzeMessage(unifiedMessage.body, contactToAnalyze);
+
                         if (analysis) {
                             console.log('AI Analysis result:', analysis);
                             const updateData: any = {};
 
-                            // Combine existing tags with new AI tags (unique)
                             const currentTags = contactToAnalyze.tags || [];
                             updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
 
-                            // Map extracted data to contact fields
                             if (analysis.extracted_data.first_name) updateData.first_name = analysis.extracted_data.first_name;
                             if (analysis.extracted_data.last_name) updateData.last_name = analysis.extracted_data.last_name;
                             if (analysis.extracted_data.email) updateData.email = analysis.extracted_data.email;
-                            if (analysis.extracted_data.phone) updateData.phone = analysis.extracted_data.phone;
+                            if (analysis.extracted_data.phone) updateData.phone = String(analysis.extracted_data.phone);
 
                             const existingMetadata = contactToAnalyze.metadata || {};
                             updateData.metadata = {
@@ -150,13 +150,15 @@ export async function POST(request: NextRequest) {
                                 ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
                                 ai_summary: analysis.extracted_data.summary,
                                 last_analysis_at: new Date().toISOString(),
-                                debug_last_ai_raw: analysis // Store raw for debugging
+                                debug_last_ai_raw: analysis
                             };
 
                             await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
-                            console.log('Contact enriched by AI');
+                            console.log('Contact enriched by AI successfully');
                         }
-                    }).catch(err => console.error('AI Enrichment failed:', err));
+                    } catch (enrichError) {
+                        console.error('AI Enrichment failed:', enrichError);
+                    }
                 }
             }
         }
