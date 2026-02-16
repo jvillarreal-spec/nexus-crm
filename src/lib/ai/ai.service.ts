@@ -122,7 +122,7 @@ export class AIService {
         }
         throw new Error("AI: Internal loop error");
     }
-    async getSalesAdvice(message: string, currentData: any = {}): Promise<any> {
+    async getSalesAdvice(message: string, currentData: any = {}, businessContext: string = ""): Promise<any> {
         if (!process.env.GOOGLE_GEMINI_API_KEY) {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
@@ -131,15 +131,18 @@ export class AIService {
         const prompt = `
         Eres un Sales Coach experto de NexusCRM. Tu objetivo es ayudar al asesor a cerrar una venta analizando el mensaje del cliente.
         
-        CONTEXTO DEL CLIENTE: ${JSON.stringify(currentData)}
+        CONOCIMIENTO DE LA EMPRESA (CONTEXTO):
+        ${businessContext || "No hay contexto específico configurado. Sé profesional y utiliza técnicas de venta genéricas."}
+
+        CONTEXTO DEL CLIENTE ACTUAL: ${JSON.stringify(currentData)}
         
         MENSAJE ACTUAL DEL CLIENTE:
         "${message}"
         
         TU TAREA:
         1. Identifica el "Insights del Cliente": ¿Qué quiere realmente? ¿Tiene prisa? ¿Tiene dudas?
-        2. "Próximo Paso Sugerido": ¿Qué acción concreta debe tomar el asesor ahora?
-        3. "Manejo de Objeciones": Si hay dudas de precio o confianza, sugiere cómo resolverlas.
+        2. "Próximo Paso Sugerido": ¿Qué acción concreta debe tomar el asesor ahora basado en el contexto de la empresa?
+        3. "Manejo de Objeciones": Si hay dudas de precio o confianza, sugiere cómo resolverlas usando lo que sabes de la empresa.
         4. "Sugerencias de Respuesta": Crea 2 opciones de respuesta corta y profesional (estilo WhatsApp) listas para copiar.
         
         RESPONDE ÚNICAMENTE EN FORMATO JSON:

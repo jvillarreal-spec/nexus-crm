@@ -130,7 +130,16 @@ export async function POST(request: NextRequest) {
                         const ai = new AIService();
                         const contactToAnalyze = currentContact;
 
-                        // Check if API KEY is missing and report it via metadata
+                        // Fetch Business Context (Knowledge Base)
+                        const { data: knowledge } = await supabase
+                            .from('organization_knowledge')
+                            .select('content')
+                            .limit(1)
+                            .maybeSingle();
+
+                        const businessContext = knowledge?.content || "";
+
+                        // Check if API KEY is missing...
                         if (!process.env.GOOGLE_GEMINI_API_KEY) {
                             await supabase.from('contacts').update({
                                 metadata: {
@@ -140,12 +149,13 @@ export async function POST(request: NextRequest) {
                             }).eq('id', contactToAnalyze.id);
                         }
 
+                        // Pass businessContext to analyzer as well (to improve labeling/summary)
                         const analysis = await ai.analyzeMessage(unifiedMessage.body, contactToAnalyze);
 
                         // Generate Sales Advice as well
                         let salesAdvice = null;
                         try {
-                            salesAdvice = await ai.getSalesAdvice(unifiedMessage.body, contactToAnalyze);
+                            salesAdvice = await ai.getSalesAdvice(unifiedMessage.body, contactToAnalyze, businessContext);
                         } catch (adviceError) {
                             console.warn('AI Sales Advice failed but continuing:', adviceError);
                         }

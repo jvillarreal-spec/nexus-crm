@@ -12,15 +12,17 @@ import {
     Settings,
     Menu,
     X,
-    Zap
+    Zap,
+    BookOpen
 } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Assuming you implement this utility or use clsx directly
+import { cn } from '@/lib/utils';
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Chat', href: '/chat', icon: MessageSquare },
     { name: 'Contactos', href: '/contacts', icon: Users },
     { name: 'Deals', href: '/deals', icon: Briefcase },
+    { name: 'Contexto', href: '/context', icon: BookOpen },
     { name: 'Respuestas', href: '/quick-replies', icon: Zap },
     { name: 'Configuración', href: '/settings', icon: Settings },
 ];
