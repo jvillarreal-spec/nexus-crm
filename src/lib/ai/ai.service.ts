@@ -2,7 +2,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export interface AIAnalysisResult {
     intent: string;
@@ -27,6 +26,9 @@ export class AIService {
         if (!process.env.GOOGLE_GEMINI_API_KEY) {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
+
+        // Initialize model locally to ensure correct versioning/config
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         const prompt = `
         Eres un asistente experto en CRM (NexusCRM). Tu tarea es analizar el mensaje de un cliente y extraer información estructurada.
@@ -76,7 +78,8 @@ export class AIService {
             return JSON.parse(text) as AIAnalysisResult;
         } catch (error: any) {
             console.error("AIService: Error calling Gemini API:", error);
-            throw new Error(`Gemini API Error: ${error.message || 'Unknown error'}`);
+            // More descriptive error
+            throw new Error(`Gemini API Error (${model.model}): ${error.message || 'Unknown error'}`);
         }
     }
 }
