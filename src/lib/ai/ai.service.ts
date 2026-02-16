@@ -18,6 +18,8 @@ export interface AIAnalysisResult {
     sentiment: 'positive' | 'neutral' | 'negative';
 }
 
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
+
 export class AIService {
     /**
      * Analyzes a message or conversation to extract CRM-ready data.
@@ -27,9 +29,19 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Initialize model locally to ensure correct versioning/config
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        // Try primary model first, fallback if it fails
+        const primaryModel = "gemini-1.5-flash";
+        const fallbackModel = "gemini-pro";
 
+        return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
+    }
+
+    private async generateWithFallback(
+        modelName: string,
+        fallbackName: string,
+        message: string,
+        currentData: any
+    ): Promise<AIAnalysisResult> {
         const prompt = `
         Eres un asistente experto en CRM (NexusCRM). Tu tarea es analizar el mensaje de un cliente y extraer información estructurada.
         
@@ -65,7 +77,7 @@ export class AIService {
         `;
 
         try {
-            // Use native JSON mode if available or ensure clean text
+            const model = genAI.getGenerativeModel({ model: modelName });
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -73,13 +85,25 @@ export class AIService {
                 }
             });
             const response = await result.response;
-            const text = response.text();
-
-            return JSON.parse(text) as AIAnalysisResult;
+            return JSON.parse(response.text()) as AIAnalysisResult;
         } catch (error: any) {
-            console.error("AIService: Error calling Gemini API:", error);
-            // More descriptive error
-            throw new Error(`Gemini API Error (${model.model}): ${error.message || 'Unknown error'}`);
+            console.warn(`Primary model ${modelName} failed:`, error.message);
+
+            // If it's a 404 or specific model error, try fallback
+            if (error.message.includes('404') || error.message.includes('not found')) {
+                try {
+                    console.log(`Attempting fallback to ${fallbackName}...`);
+                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName });
+                    const result = await fallbackModel.generateContent(prompt); // Older models might not support JSON mode config
+                    const response = await result.response;
+                    const text = response.text();
+                    const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    return JSON.parse(jsonText) as AIAnalysisResult;
+                } catch (fallbackError: any) {
+                    throw new Error(`Both ${modelName} and ${fallbackName} failed. Last error: ${fallbackError.message}`);
+                }
+            }
+            throw error;
         }
     }
 }
