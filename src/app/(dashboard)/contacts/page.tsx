@@ -7,6 +7,7 @@ import { User, Phone, Mail, Tag, Search, MoreVertical, X, Building2, DollarSign,
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export default function ContactsPage() {
     const [contacts, setContacts] = useState<any[]>([]);
@@ -14,6 +15,7 @@ export default function ContactsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedContact, setSelectedContact] = useState<any | null>(null);
     const supabase = createClient();
+    const router = useRouter();
 
     useEffect(() => {
         fetchContacts();
@@ -265,7 +267,10 @@ export default function ContactsPage() {
 
                             {/* Footer / Actions */}
                             <div className="p-6 border-t border-[#2a2e3d] bg-[#232732]/10 flex gap-3">
-                                <button className="flex-1 bg-[#2AABEE] hover:bg-[#2299d4] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                                <button
+                                    onClick={() => router.push(`/chat?contactId=${selectedContact.id}`)}
+                                    className="flex-1 bg-[#2AABEE] hover:bg-[#2299d4] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                                >
                                     <MessageCircle size={18} />
                                     Abrir Chat
                                 </button>

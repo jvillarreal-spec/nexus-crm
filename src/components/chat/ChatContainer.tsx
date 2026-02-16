@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import ConversationList from './ConversationList';
-import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { createClient } from '@/lib/supabase/client';
 import { MessageSquare } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 
 interface Contact {
@@ -20,6 +20,29 @@ export default function ChatContainer() {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [activeContact, setActiveContact] = useState<Contact | null>(null); // Fixed 'any' type
     const supabase = createClient();
+    const searchParams = useSearchParams();
+    const contactIdFromUrl = searchParams.get('contactId');
+
+    // Handle deep linking from Contacts page
+    useEffect(() => {
+        if (contactIdFromUrl) {
+            fetchConversationForContact(contactIdFromUrl);
+        }
+    }, [contactIdFromUrl]);
+
+    async function fetchConversationForContact(contactId: string) {
+        const { data: conversation, error } = await supabase
+            .from('conversations')
+            .select('id, contacts(*)')
+            .eq('contact_id', contactId)
+            .eq('status', 'open')
+            .maybeSingle();
+
+        if (conversation) {
+            setSelectedConversationId(conversation.id);
+            setActiveContact(conversation.contacts as any);
+        }
+    }
 
     return (
         <div className="flex h-full overflow-hidden bg-[#0f1117]">
