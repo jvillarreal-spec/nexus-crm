@@ -23,14 +23,13 @@ export class AIService {
     /**
      * Analyzes a message or conversation to extract CRM-ready data.
      */
-    async analyzeMessage(message: string, currentData: any = {}): Promise<AIAnalysisResult | null> {
+    async analyzeMessage(message: string, currentData: any = {}): Promise<AIAnalysisResult> {
         if (!process.env.GOOGLE_GEMINI_API_KEY) {
-            console.error("AIService: GOOGLE_GEMINI_API_KEY is not set.");
-            return null;
+            throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
         const prompt = `
-        Eres un asistente experto en CRM (NexusCRM). Tu tarea es analizar el mensaje de un cliente y extraer información estructurada para alimentar la base de datos.
+        Eres un asistente experto en CRM (NexusCRM). Tu tarea es analizar el mensaje de un cliente y extraer información estructurada.
         
         Información actual del contacto (si existe): ${JSON.stringify(currentData)}
         
@@ -43,7 +42,7 @@ export class AIService {
            CRÍTICO: "celular", "teléfono", "móvil", "whatsapp" son sinónimos. Si detectas un número de 7 a 15 dígitos, regístralo en "phone".
         3. Extrae nombre, email, empresa, presupuesto si se mencionan.
         4. Genera etiquetas útiles (ej: #Interesado, #Urgente, #LeadCalificado).
-        5. Define el sentimiento del mensaje.
+        5. Define el sentimiento del mensaje (positive, neutral, negative).
         6. Crea un resumen cortísimo (máximo 15 palabras).
         
         RESPONDE ÚNICAMENTE EN FORMATO JSON SIGUIENDO ESTA ESTRUCTURA:
@@ -64,16 +63,20 @@ export class AIService {
         `;
 
         try {
-            const result = await model.generateContent(prompt);
+            // Use native JSON mode if available or ensure clean text
+            const result = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                }
+            });
             const response = await result.response;
             const text = response.text();
 
-            // Clean the response in case it includes markdown code blocks
-            const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-            return JSON.parse(jsonText) as AIAnalysisResult;
-        } catch (error) {
+            return JSON.parse(text) as AIAnalysisResult;
+        } catch (error: any) {
             console.error("AIService: Error calling Gemini API:", error);
-            return null;
+            throw new Error(`Gemini API Error: ${error.message || 'Unknown error'}`);
         }
     }
 }
