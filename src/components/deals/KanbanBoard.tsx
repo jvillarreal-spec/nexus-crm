@@ -83,23 +83,23 @@ export function KanbanBoard() {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 items-start overflow-x-auto pb-4">
+        <div className="flex gap-6 items-start overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
             {STAGES.map((stage) => {
                 const stageContacts = contacts.filter(c => getStageForContact(c) === stage.id);
 
                 return (
-                    <div key={stage.id} className="min-w-[280px] space-y-4">
-                        <div className="flex items-center justify-between px-2 bg-[#1a1d27]/50 py-2 rounded-t-lg border-b border-[#2a2e3d]">
+                    <div key={stage.id} className="w-[300px] flex-shrink-0 space-y-4">
+                        <div className="flex items-center justify-between px-3 bg-[#1a1d27]/50 py-2.5 rounded-t-xl border-b border-[#2a2e3d]">
                             <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${stage.color}`}></div>
-                                <span className="text-xs font-bold text-white uppercase tracking-wider">{stage.title}</span>
+                                <span className="text-[11px] font-bold text-white uppercase tracking-widest">{stage.title}</span>
                             </div>
-                            <span className="text-[10px] bg-[#2a2e3d] text-[#8b8fa3] px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] bg-[#2a2e3d] text-[#8b8fa3] px-2.5 py-0.5 rounded-full font-medium">
                                 {stageContacts.length}
                             </span>
                         </div>
 
-                        <div className="space-y-3 p-1 min-h-[300px]">
+                        <div className="space-y-3 min-h-[500px] bg-[#1a1d27]/20 rounded-b-xl p-1.5 transition-colors">
                             {stageContacts.length > 0 ? (
                                 stageContacts.map((contact) => (
                                     <DealCard
@@ -113,8 +113,8 @@ export function KanbanBoard() {
                                     />
                                 ))
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-[#2a2e3d]/50 rounded-xl text-[#4a4e5d]">
-                                    <span className="text-[10px]">Sin movimientos</span>
+                                <div className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-[#2a2e3d]/30 rounded-xl text-[#4a4e5d] group-hover:border-[#2a2e3d]/50 transition-colors">
+                                    <span className="text-[10px] font-medium italic">Sin movimientos</span>
                                 </div>
                             )}
                         </div>
