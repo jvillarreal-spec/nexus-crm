@@ -27,10 +27,9 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Use discovered successful model names for this account
-        // 'lite' models usually have better quota on free tier
-        const primaryModel = "gemini-2.0-flash-lite";
-        const fallbackModel = "gemini-flash-latest";
+        // Use aliases that were confirmed in your v1beta list
+        const primaryModel = "gemini-flash-latest";
+        const fallbackModel = "gemini-pro-latest";
 
         return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
     }
@@ -76,23 +75,22 @@ export class AIService {
         `;
 
         try {
-            // Force v1 stable API - Removed responseMimeType as it's not supported in v1 for some models/regions
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
+            // Using v1beta as the discovery showed it contains the 'latest' aliases
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
 
-            // Clean the response in case it includes markdown code blocks
             const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
             return JSON.parse(jsonText) as AIAnalysisResult;
         } catch (error: any) {
-            console.warn(`Primary model ${modelName} (v1) failed:`, error.message);
+            console.warn(`Primary model ${modelName} failed:`, error.message);
 
-            // If it's a 404, specific model error, or 400 (bad config), try fallback
-            if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('not supported') || error.message.includes('400')) {
+            // If it's 404, 429 (quota), or 400, try fallback
+            if (error.message.includes('404') || error.message.includes('429') || error.message.includes('400')) {
                 try {
-                    console.log(`Attempting fallback to ${fallbackName} (v1)...`);
-                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1" });
+                    console.log(`Attempting fallback to ${fallbackName}...`);
+                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
                     const result = await fallbackModel.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
@@ -100,7 +98,7 @@ export class AIService {
                     const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                     return JSON.parse(jsonText) as AIAnalysisResult;
                 } catch (fallbackError: any) {
-                    throw new Error(`Both ${modelName} and ${fallbackName} failed on v1 API. Last error: ${fallbackError.message}`);
+                    throw new Error(`Both ${modelName} and ${fallbackName} failed. Last error: ${fallbackError.message}`);
                 }
             }
             throw error;
