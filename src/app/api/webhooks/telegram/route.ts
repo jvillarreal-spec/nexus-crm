@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         // a. Ensure Contact Exists
         const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .select('id, tags, metadata, first_name, last_name, email')
+            .select('id, tags, metadata, first_name, last_name, email, phone')
             .eq('channel', 'telegram')
             .eq('channel_id', unifiedMessage.chatId)
             .maybeSingle();
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
                     first_name: unifiedMessage.senderName,
                     username: unifiedMessage.senderUsername,
                 })
-                .select('id, tags, metadata, first_name, last_name, email')
+                .select('id, tags, metadata, first_name, last_name, email, phone')
                 .single();
 
             if (insertError) {
@@ -114,11 +114,16 @@ export async function POST(request: NextRequest) {
                 } else {
                     console.log('Message saved successfully');
 
-                    // d. Update Conversation Metadata
-                    await supabase.from('conversations').update({
-                        last_message_at: new Date().toISOString(),
-                        unread_count: (conversation.unread_count || 0) + 1
-                    }).eq('id', conversation.id);
+                    // d. Update Conversation & Contact Metadata Immediately
+                    await Promise.all([
+                        supabase.from('conversations').update({
+                            last_message_at: new Date().toISOString(),
+                            unread_count: (conversation.unread_count || 0) + 1
+                        }).eq('id', conversation.id),
+                        supabase.from('contacts').update({
+                            updated_at: new Date().toISOString()
+                        }).eq('id', currentContact.id)
+                    ]);
 
                     // e. AI Enrichment (Asynchronous)
                     const ai = new AIService();
