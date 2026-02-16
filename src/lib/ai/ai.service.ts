@@ -27,9 +27,9 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Try primary model first, fallback if it fails
+        // Use stable v1 API and standard model names
         const primaryModel = "gemini-1.5-flash";
-        const fallbackModel = "gemini-pro";
+        const fallbackModel = "gemini-1.0-pro";
 
         return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
     }
@@ -75,7 +75,8 @@ export class AIService {
         `;
 
         try {
-            const model = genAI.getGenerativeModel({ model: modelName });
+            // Force v1 stable API
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
             const result = await model.generateContent({
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -85,20 +86,22 @@ export class AIService {
             const response = await result.response;
             return JSON.parse(response.text()) as AIAnalysisResult;
         } catch (error: any) {
-            console.warn(`Primary model ${modelName} failed:`, error.message);
+            console.warn(`Primary model ${modelName} (v1) failed:`, error.message);
 
             // If it's a 404 or specific model error, try fallback
-            if (error.message.includes('404') || error.message.includes('not found')) {
+            if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('not supported')) {
                 try {
-                    console.log(`Attempting fallback to ${fallbackName}...`);
-                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName });
-                    const result = await fallbackModel.generateContent(prompt); // Older models might not support JSON mode config
+                    console.log(`Attempting fallback to ${fallbackName} (v1)...`);
+                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1" });
+                    const result = await fallbackModel.generateContent(prompt);
                     const response = await result.response;
                     const text = response.text();
+
+                    // Simple cleaning for non-JSON-mode fallback
                     const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                     return JSON.parse(jsonText) as AIAnalysisResult;
                 } catch (fallbackError: any) {
-                    throw new Error(`Both ${modelName} and ${fallbackName} failed. Last error: ${fallbackError.message}`);
+                    throw new Error(`Both ${modelName} and ${fallbackName} failed on v1 API. Last error: ${fallbackError.message}`);
                 }
             }
             throw error;
