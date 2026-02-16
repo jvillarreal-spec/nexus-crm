@@ -65,7 +65,7 @@ export class AIService {
     private async generateWithRetry(prompt: string, modelName: string, attempt: number = 0): Promise<any> {
         const maxRetries = 3;
         try {
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
