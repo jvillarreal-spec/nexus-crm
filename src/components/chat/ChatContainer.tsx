@@ -1,35 +1,42 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ConversationList from './ConversationList';
-import MessageList from './MessageList';
-import ChatInput from './ChatInput';
-import { createClient } from '@/lib/supabase/client';
-import { MessageSquare } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
-
-
-interface Contact {
-    id: string;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-    // Add any other properties of a contact if known
-}
+import { SalesCoach } from './SalesCoach';
 
 export default function ChatContainer() {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-    const [activeContact, setActiveContact] = useState<Contact | null>(null); // Fixed 'any' type
+    const [activeContact, setActiveContact] = useState<any | null>(null);
     const supabase = createClient();
     const searchParams = useSearchParams();
     const contactIdFromUrl = searchParams.get('contactId');
 
-    // Handle deep linking from Contacts page
+    // Handle deep linking and metadata refresh
     useEffect(() => {
         if (contactIdFromUrl) {
             fetchConversationForContact(contactIdFromUrl);
         }
     }, [contactIdFromUrl]);
+
+    // Real-time metadata sync for the active contact (to see Sales Coach live updates)
+    useEffect(() => {
+        if (!activeContact?.id) return;
+
+        const subscription = supabase
+            .channel(`active_contact_${activeContact.id}`)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'contacts',
+                filter: `id=eq.${activeContact.id}`
+            }, (payload) => {
+                setActiveContact(payload.new);
+            })
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [activeContact?.id]);
 
     async function fetchConversationForContact(contactId: string) {
         const { data: conversation, error } = await supabase
@@ -48,14 +55,14 @@ export default function ChatContainer() {
     return (
         <div className="flex h-full overflow-hidden bg-[#0f1117]">
             {/* Sidebar: Conversation List */}
-            <div className="w-full md:w-80 lg:w-96 border-r border-[#2a2e3d] flex flex-col bg-[#1a1d27]">
+            <div className="w-full md:w-80 border-r border-[#2a2e3d] flex flex-col bg-[#1a1d27]">
                 <div className="p-4 border-b border-[#2a2e3d]">
-                    <h2 className="text-xl font-bold text-white">Mensajes</h2>
-                    <div className="mt-2 text-sm text-[#8b8fa3]">
-                        Telegram
+                    <h2 className="text-xl font-bold text-white tracking-tight">Chats</h2>
+                    <div className="mt-1 text-[10px] text-[#2AABEE] font-bold uppercase tracking-widest">
+                        Canal: Telegram
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <ConversationList
                         onSelect={(id: string, contact: any) => {
                             setSelectedConversationId(id);
@@ -66,45 +73,57 @@ export default function ChatContainer() {
                 </div>
             </div>
 
-            {/* Main: Chat View */}
-            <div className="hidden md:flex flex-1 flex-col bg-[#0f1117]">
+            {/* Main Content Area */}
+            <div className="flex-1 flex overflow-hidden">
                 {selectedConversationId ? (
                     <>
-                        {/* Chat Header */}
-                        <div className="h-16 px-6 border-b border-[#2a2e3d] flex items-center justify-between bg-[#1a1d27]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-[#232732] flex items-center justify-center font-bold text-[#2AABEE]">
-                                    {activeContact?.first_name?.[0] || 'U'}
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-white">
-                                        {activeContact?.first_name} {activeContact?.last_name || ''}
-                                    </h3>
-                                    <p className="text-xs text-[#8b8fa3]">
-                                        @{activeContact?.username || 'user'}
-                                    </p>
+                        {/* Center: Chat View */}
+                        <div className="flex-1 flex flex-col bg-[#0f1117] relative">
+                            {/* Chat Header */}
+                            <div className="h-16 px-6 border-b border-[#2a2e3d] flex items-center justify-between bg-[#1a1d27]/80 backdrop-blur-md z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-[#232732] flex items-center justify-center font-bold text-[#2AABEE] border border-[#2AABEE]/20 shadow-lg shadow-[#2AABEE]/5">
+                                        {activeContact?.first_name?.[0] || 'U'}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-white">
+                                            {activeContact?.first_name} {activeContact?.last_name || ''}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                                            <p className="text-[11px] text-[#8b8fa3]">
+                                                @{activeContact?.username || 'user'}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                {/* Actions could go here */}
+
+                            {/* Messages Area */}
+                            <div className="flex-1 overflow-hidden relative bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+                                <MessageList conversationId={selectedConversationId} />
+                            </div>
+
+                            {/* Input Area */}
+                            <div className="p-4 bg-[#1a1d27]/50 backdrop-blur-md border-t border-[#2a2e3d]">
+                                <ChatInput conversationId={selectedConversationId} contactId={activeContact.id} />
                             </div>
                         </div>
 
-                        {/* Messages */}
-                        <div className="flex-1 overflow-hidden relative">
-                            <MessageList conversationId={selectedConversationId} />
+                        {/* Right Sidebar: AI Sales Coach */}
+                        <div className="hidden lg:block w-80 xl:w-96 p-4 border-l border-[#2a2e3d] bg-[#0f1117]">
+                            <SalesCoach advice={activeContact?.metadata?.ai_sales_advice} />
                         </div>
-                        {/* Input */}
-                        {selectedConversationId && activeContact?.id && (
-                            <ChatInput conversationId={selectedConversationId} contactId={activeContact.id} />
-                        )}
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-[#8b8fa3] space-y-4">
-                        <div className="p-4 bg-[#1a1d27] rounded-full">
-                            <MessageSquare className="w-12 h-12 text-[#8b8fa3] opacity-20" />
+                    <div className="flex-1 flex flex-col items-center justify-center text-[#8b8fa3] space-y-4 bg-[#0f1117] bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+                        <div className="p-6 bg-[#1a1d27] rounded-3xl border border-[#2a2e3d] shadow-2xl">
+                            <MessageSquare className="w-16 h-16 text-[#2AABEE] opacity-40" />
                         </div>
-                        <p className="text-sm">Selecciona una conversación para empezar</p>
+                        <div className="text-center">
+                            <h3 className="text-white font-medium">No hay chat seleccionado</h3>
+                            <p className="text-xs mt-1">Selecciona una conversación para desbloquear el AI Sales Coach</p>
+                        </div>
                     </div>
                 )}
             </div>

@@ -122,4 +122,58 @@ export class AIService {
         }
         throw new Error("AI: Internal loop error");
     }
+    async getSalesAdvice(message: string, currentData: any = {}): Promise<any> {
+        if (!process.env.GOOGLE_GEMINI_API_KEY) {
+            throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
+        }
+
+        const modelName = "gemini-2.0-flash";
+        const prompt = `
+        Eres un Sales Coach experto de NexusCRM. Tu objetivo es ayudar al asesor a cerrar una venta analizando el mensaje del cliente.
+        
+        CONTEXTO DEL CLIENTE: ${JSON.stringify(currentData)}
+        
+        MENSAJE ACTUAL DEL CLIENTE:
+        "${message}"
+        
+        TU TAREA:
+        1. Identifica el "Insights del Cliente": ¿Qué quiere realmente? ¿Tiene prisa? ¿Tiene dudas?
+        2. "Próximo Paso Sugerido": ¿Qué acción concreta debe tomar el asesor ahora?
+        3. "Manejo de Objeciones": Si hay dudas de precio o confianza, sugiere cómo resolverlas.
+        4. "Sugerencias de Respuesta": Crea 2 opciones de respuesta corta y profesional (estilo WhatsApp) listas para copiar.
+        
+        RESPONDE ÚNICAMENTE EN FORMATO JSON:
+        {
+          "insights": "string",
+          "next_step": "string",
+          "objection_handling": "string o null",
+          "suggested_replies": [
+            "opción 1",
+            "opción 2"
+          ]
+        }
+        `;
+
+        const maxRetries = 2;
+        let attempt = 0;
+
+        while (attempt <= maxRetries) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+
+                const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                return JSON.parse(jsonText);
+            } catch (error: any) {
+                if (error.message.includes('503') && attempt < maxRetries) {
+                    attempt++;
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    continue;
+                }
+                throw error;
+            }
+        }
+    }
 }

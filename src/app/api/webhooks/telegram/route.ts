@@ -142,6 +142,14 @@ export async function POST(request: NextRequest) {
 
                         const analysis = await ai.analyzeMessage(unifiedMessage.body, contactToAnalyze);
 
+                        // Generate Sales Advice as well
+                        let salesAdvice = null;
+                        try {
+                            salesAdvice = await ai.getSalesAdvice(unifiedMessage.body, contactToAnalyze);
+                        } catch (adviceError) {
+                            console.warn('AI Sales Advice failed but continuing:', adviceError);
+                        }
+
                         if (analysis) {
                             console.log('AI Analysis result:', analysis);
                             const updateData: any = {};
@@ -162,9 +170,10 @@ export async function POST(request: NextRequest) {
                                 ...(analysis.extracted_data.company ? { company: analysis.extracted_data.company } : {}),
                                 ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
                                 ai_summary: analysis.extracted_data.summary,
+                                ai_sales_advice: salesAdvice,
                                 last_analysis_at: new Date().toISOString(),
                                 debug_last_ai_raw: analysis,
-                                ai_error: null // Clear previous errors
+                                ai_error: null
                             };
 
                             await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
