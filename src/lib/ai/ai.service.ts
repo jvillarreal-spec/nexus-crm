@@ -75,21 +75,20 @@ export class AIService {
         `;
 
         try {
-            // Force v1 stable API
+            // Force v1 stable API - Removed responseMimeType as it's not supported in v1 for some models/regions
             const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                }
-            });
+            const result = await model.generateContent(prompt);
             const response = await result.response;
-            return JSON.parse(response.text()) as AIAnalysisResult;
+            const text = response.text();
+
+            // Clean the response in case it includes markdown code blocks
+            const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+            return JSON.parse(jsonText) as AIAnalysisResult;
         } catch (error: any) {
             console.warn(`Primary model ${modelName} (v1) failed:`, error.message);
 
-            // If it's a 404 or specific model error, try fallback
-            if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('not supported')) {
+            // If it's a 404, specific model error, or 400 (bad config), try fallback
+            if (error.message.includes('404') || error.message.includes('not found') || error.message.includes('not supported') || error.message.includes('400')) {
                 try {
                     console.log(`Attempting fallback to ${fallbackName} (v1)...`);
                     const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1" });
@@ -97,7 +96,6 @@ export class AIService {
                     const response = await result.response;
                     const text = response.text();
 
-                    // Simple cleaning for non-JSON-mode fallback
                     const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                     return JSON.parse(jsonText) as AIAnalysisResult;
                 } catch (fallbackError: any) {
