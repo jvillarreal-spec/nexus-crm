@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
         const supabase = createAdminClient();
 
         // a. Ensure Contact Exists
-        let { data: contact, error: contactError } = await supabase
+        const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .select('id')
+            .select('id, tags, metadata, first_name, last_name, email')
             .eq('channel', 'telegram')
             .eq('channel_id', unifiedMessage.chatId)
-            .maybeSingle(); // maybeSingle returns null instead of throwing if not found
+            .maybeSingle();
 
         if (contactError) {
             console.error('Error fetching contact:', contactError);
