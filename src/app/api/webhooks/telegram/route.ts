@@ -149,10 +149,12 @@ export async function POST(request: NextRequest) {
                             const currentTags = contactToAnalyze.tags || [];
                             updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
 
-                            if (analysis.extracted_data.first_name) updateData.first_name = analysis.extracted_data.first_name;
-                            if (analysis.extracted_data.last_name) updateData.last_name = analysis.extracted_data.last_name;
-                            if (analysis.extracted_data.email) updateData.email = analysis.extracted_data.email;
-                            if (analysis.extracted_data.phone) updateData.phone = String(analysis.extracted_data.phone);
+                            const isVal = (val: any) => val && val !== 'null' && val !== 'undefined';
+
+                            if (isVal(analysis.extracted_data.first_name)) updateData.first_name = analysis.extracted_data.first_name;
+                            if (isVal(analysis.extracted_data.last_name)) updateData.last_name = analysis.extracted_data.last_name;
+                            if (isVal(analysis.extracted_data.email)) updateData.email = analysis.extracted_data.email;
+                            if (isVal(analysis.extracted_data.phone)) updateData.phone = String(analysis.extracted_data.phone);
 
                             const existingMetadata = contactToAnalyze.metadata || {};
                             updateData.metadata = {

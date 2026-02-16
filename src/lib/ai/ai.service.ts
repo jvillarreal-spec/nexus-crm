@@ -50,9 +50,13 @@ export class AIService {
         
         INSTRUCCIONES:
         1. Analiza la intención (ventas, soporte, información, queja, saludo).
-        2. Extrae datos personales. 
-           CRÍTICO: "celular", "teléfono", "móvil", "whatsapp" son sinónimos. Si detectas un número de 7 a 15 dígitos, regístralo en "phone".
-        3. Extrae nombre, email, empresa, presupuesto si se mencionan.
+        2. EXTRACCIÓN DE DATOS (Prioridad CRÍTICA):
+           - "phone": Busca números de 7 a 15 dígitos. "celular", "teléfono", "móvil", "whatsapp" son lo mismo.
+           - "email": Busca patrones de correo electrónico (ej. nombre@dominio.com).
+           - "first_name"/"last_name": Busca nombres propios. Si el usuario dice "Soy [Nombre]", "Me llamo [Nombre]" o similares.
+           - "company": Busca nombres de empresas u organizaciones.
+           - "budget": Busca montos de dinero o rangos.
+        3. No inventes datos. Si no encuentras algo, ponlo como null (sin comillas).
         4. Genera etiquetas útiles (ej: #Interesado, #Urgente, #LeadCalificado).
         5. Define el sentimiento del mensaje (positive, neutral, negative).
         6. Crea un resumen cortísimo (máximo 15 palabras).
@@ -63,12 +67,12 @@ export class AIService {
           "tags": ["string"],
           "sentiment": "positive|neutral|negative",
           "extracted_data": {
-            "first_name": "string o null",
-            "last_name": "string o null",
-            "email": "string o null",
-            "phone": "string o null",
-            "company": "string o null",
-            "budget": "string o null",
+            "first_name": "string | null",
+            "last_name": "string | null",
+            "email": "string | null",
+            "phone": "string | null",
+            "company": "string | null",
+            "budget": "string | null",
             "summary": "string"
           }
         }
