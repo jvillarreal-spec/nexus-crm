@@ -27,7 +27,7 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Use aliases that were confirmed in your v1beta list
+        // Using aliases confirmed in the account discovery
         const primaryModel = "gemini-flash-latest";
         const fallbackModel = "gemini-pro-latest";
 
@@ -75,7 +75,7 @@ export class AIService {
         `;
 
         try {
-            // Using v1beta as the discovery showed it contains the 'latest' aliases
+            console.log(`AI: Requesting analysis from ${modelName}...`);
             const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
@@ -84,24 +84,21 @@ export class AIService {
             const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
             return JSON.parse(jsonText) as AIAnalysisResult;
         } catch (error: any) {
-            console.warn(`Primary model ${modelName} failed:`, error.message);
+            console.warn(`AI: Primary model ${modelName} failed. Reason: ${error.message}`);
 
-            // If it's 404, 429 (quota), or 400, try fallback
-            if (error.message.includes('404') || error.message.includes('429') || error.message.includes('400')) {
-                try {
-                    console.log(`Attempting fallback to ${fallbackName}...`);
-                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
-                    const result = await fallbackModel.generateContent(prompt);
-                    const response = await result.response;
-                    const text = response.text();
+            try {
+                console.log(`AI: Attempting fallback to ${fallbackName}...`);
+                const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
+                const result = await fallbackModel.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
 
-                    const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-                    return JSON.parse(jsonText) as AIAnalysisResult;
-                } catch (fallbackError: any) {
-                    throw new Error(`Both ${modelName} and ${fallbackName} failed. Last error: ${fallbackError.message}`);
-                }
+                const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                return JSON.parse(jsonText) as AIAnalysisResult;
+            } catch (fallbackError: any) {
+                // Return a clear error that includes the models tried
+                throw new Error(`[AI_FAILURE] Primary (${modelName}) & Fallback (${fallbackName}) failed. Last error: ${fallbackError.message}`);
             }
-            throw error;
         }
     }
 }
