@@ -1,8 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
-import { BotLogic } from '@/lib/bot/bot.logic';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { AIService } from '@/lib/ai/ai.service';
 
 export async function POST(request: NextRequest) {
     console.log('--- Telegram Webhook received ---');
@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
         console.log(`Processing message from ${unifiedMessage.senderName} (${unifiedMessage.chatId})`);
 
         // 3. Process Bot Logic (Asynchronous response to user)
-        const bot = new BotLogic(adapter);
-        await bot.handleIncomingMessage(unifiedMessage);
+        // Note: For now we'll store first and then analyze
+        // const bot = new BotLogic(adapter);
+        // await bot.handleIncomingMessage(unifiedMessage);
 
         // 4. Store in DB (Supabase Admin)
         console.log('Storing in database...');
@@ -116,6 +117,40 @@ export async function POST(request: NextRequest) {
                         last_message_at: new Date().toISOString(),
                         unread_count: (conversation.unread_count || 0) + 1
                     }).eq('id', conversation.id);
+
+                    // e. AI Enrichment (Asynchronous)
+                    const ai = new AIService();
+                    ai.analyzeMessage(unifiedMessage.body, contact).then(async (analysis) => {
+                        if (analysis) {
+                            console.log('AI Analysis result:', analysis);
+                            const updateData: any = {};
+
+                            // Combine existing tags with new AI tags (unique)
+                            const currentTags = contact.tags || [];
+                            updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
+
+                            // Map extracted data to contact fields
+                            if (analysis.extracted_data.first_name) updateData.first_name = analysis.extracted_data.first_name;
+                            if (analysis.extracted_data.last_name) updateData.last_name = analysis.extracted_data.last_name;
+                            if (analysis.extracted_data.email) updateData.email = analysis.extracted_data.email;
+                            if (analysis.extracted_data.company) {
+                                updateData.metadata = {
+                                    ...(contact.metadata || {}),
+                                    company: analysis.extracted_data.company,
+                                    ai_summary: analysis.extracted_data.summary
+                                };
+                            }
+                            if (analysis.extracted_data.budget) {
+                                updateData.metadata = {
+                                    ...(updateData.metadata || contact.metadata || {}),
+                                    estimated_budget: analysis.extracted_data.budget
+                                };
+                            }
+
+                            await supabase.from('contacts').update(updateData).eq('id', contact.id);
+                            console.log('Contact enriched by AI');
+                        }
+                    }).catch(err => console.error('AI Enrichment failed:', err));
                 }
             }
         }
