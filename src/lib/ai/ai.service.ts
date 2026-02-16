@@ -27,9 +27,9 @@ export class AIService {
             throw new Error("GOOGLE_GEMINI_API_KEY is not set in environment variables.");
         }
 
-        // Use stable v1 API and standard model names
-        const primaryModel = "gemini-1.5-flash";
-        const fallbackModel = "gemini-1.0-pro";
+        // Use discovered successful model names for this account
+        const primaryModel = "gemini-2.0-flash";
+        const fallbackModel = "gemini-flash-latest";
 
         return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
     }
