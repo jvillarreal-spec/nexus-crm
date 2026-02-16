@@ -12,9 +12,10 @@ interface SalesAdviceProps {
         objection_handling?: string;
         suggested_replies: string[];
     } | null;
+    error?: string | null;
 }
 
-export function SalesCoach({ advice }: SalesAdviceProps) {
+export function SalesCoach({ advice, error }: SalesAdviceProps) {
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
     const copyToClipboard = (text: string, index: number) => {
@@ -22,6 +23,23 @@ export function SalesCoach({ advice }: SalesAdviceProps) {
         setCopiedIndex(index);
         setTimeout(() => setCopiedIndex(null), 2000);
     };
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 text-center space-y-4 h-full bg-red-500/5 rounded-2xl border border-dashed border-red-500/20">
+                <div className="p-3 bg-red-500/10 rounded-full text-red-500 mb-2">
+                    <Target size={24} />
+                </div>
+                <h3 className="text-red-400 font-semibold text-sm">Error en AI Coach</h3>
+                <p className="text-[#8b8fa3] text-[10px] max-w-xs break-words">
+                    {error}
+                </p>
+                <p className="text-[10px] text-[#4a4e5d]">
+                    Verifica tu API Key en AI Studio.
+                </p>
+            </div>
+        );
+    }
 
     if (!advice) {
         return (

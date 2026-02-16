@@ -125,86 +125,73 @@ export async function POST(request: NextRequest) {
                         }).eq('id', currentContact.id)
                     ]);
 
-                    // e. AI Enrichment (Awaited to ensure completion in Serverless)
+                    // e. AI Enrichment (Optimized for Serverless)
                     try {
                         const ai = new AIService();
-                        const contactToAnalyze = currentContact;
 
-                        // Fetch Business Context (Knowledge Base)
+                        // Always fetch latest to avoid race conditions with quick messages
+                        const { data: latestContact } = await supabase
+                            .from('contacts')
+                            .select('*')
+                            .eq('id', currentContact.id)
+                            .single();
+
+                        const contactToAnalyze = latestContact || currentContact;
+
+                        // Fetch Knowledge Base
                         const { data: knowledge } = await supabase
                             .from('organization_knowledge')
                             .select('content')
                             .limit(1)
                             .maybeSingle();
-
                         const businessContext = knowledge?.content || "";
 
-                        // Check if API KEY is missing...
-                        if (!process.env.GOOGLE_GEMINI_API_KEY) {
-                            await supabase.from('contacts').update({
-                                metadata: {
-                                    ...(contactToAnalyze.metadata || {}),
-                                    ai_error: 'GOOGLE_GEMINI_API_KEY is missing in environment variables.'
-                                }
-                            }).eq('id', contactToAnalyze.id);
-                        }
+                        console.log(`AI: Processing message for ${contactToAnalyze.id}...`);
 
-                        // Pass businessContext to analyzer as well (to improve labeling/summary)
-                        const analysis = await ai.analyzeMessage(unifiedMessage.body, contactToAnalyze);
+                        // Run AI tasks in parallel to speed up response
+                        const [analysisResult, salesAdviceResult] = await Promise.allSettled([
+                            ai.analyzeMessage(unifiedMessage.body, contactToAnalyze),
+                            ai.getSalesAdvice(unifiedMessage.body, contactToAnalyze, businessContext)
+                        ]);
 
-                        // Generate Sales Advice as well
-                        let salesAdvice = null;
-                        try {
-                            salesAdvice = await ai.getSalesAdvice(unifiedMessage.body, contactToAnalyze, businessContext);
-                        } catch (adviceError) {
-                            console.warn('AI Sales Advice failed but continuing:', adviceError);
-                        }
+                        const analysis = analysisResult.status === 'fulfilled' ? analysisResult.value : null;
+                        const salesAdvice = salesAdviceResult.status === 'fulfilled' ? salesAdviceResult.value : null;
 
-                        if (analysis) {
-                            console.log('AI Analysis result:', analysis);
+                        const aiError = [
+                            analysisResult.status === 'rejected' ? `Analysis: ${analysisResult.reason.message}` : null,
+                            salesAdviceResult.status === 'rejected' ? `Advice: ${salesAdviceResult.reason.message}` : null
+                        ].filter(Boolean).join(' | ');
+
+                        if (analysis || salesAdvice || aiError) {
                             const updateData: any = {};
-
-                            const currentTags = contactToAnalyze.tags || [];
-                            updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
-
-                            const isVal = (val: any) => val && val !== 'null' && val !== 'undefined';
-
-                            if (isVal(analysis.extracted_data.first_name)) updateData.first_name = analysis.extracted_data.first_name;
-                            if (isVal(analysis.extracted_data.last_name)) updateData.last_name = analysis.extracted_data.last_name;
-                            if (isVal(analysis.extracted_data.email)) updateData.email = analysis.extracted_data.email;
-                            if (isVal(analysis.extracted_data.phone)) updateData.phone = String(analysis.extracted_data.phone);
-
                             const existingMetadata = contactToAnalyze.metadata || {};
+
+                            if (analysis) {
+                                const currentTags = contactToAnalyze.tags || [];
+                                updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
+
+                                const isVal = (val: any) => val && val !== 'null' && val !== 'undefined';
+                                if (isVal(analysis.extracted_data.first_name)) updateData.first_name = analysis.extracted_data.first_name;
+                                if (isVal(analysis.extracted_data.last_name)) updateData.last_name = analysis.extracted_data.last_name;
+                                if (isVal(analysis.extracted_data.email)) updateData.email = analysis.extracted_data.email;
+                                if (isVal(analysis.extracted_data.phone)) updateData.phone = String(analysis.extracted_data.phone);
+                            }
+
                             updateData.metadata = {
                                 ...existingMetadata,
-                                ...(analysis.extracted_data.company ? { company: analysis.extracted_data.company } : {}),
-                                ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
-                                ai_summary: analysis.extracted_data.summary,
+                                ...(analysis?.extracted_data?.company ? { company: analysis.extracted_data.company } : {}),
+                                ...(analysis?.extracted_data?.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
+                                ...(analysis?.extracted_data?.summary ? { ai_summary: analysis.extracted_data.summary } : {}),
                                 ai_sales_advice: salesAdvice,
                                 last_analysis_at: new Date().toISOString(),
-                                debug_last_ai_raw: analysis,
-                                ai_error: null
+                                ai_error: aiError || null
                             };
 
                             await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
-                            console.log('Contact enriched by AI successfully');
-                        } else {
-                            // Logic reached but analysis was null
-                            await supabase.from('contacts').update({
-                                metadata: {
-                                    ...(contactToAnalyze.metadata || {}),
-                                    ai_error: 'AI analysis returned null (check prompt or API limits).'
-                                }
-                            }).eq('id', contactToAnalyze.id);
+                            console.log('AI Enrichment finished');
                         }
                     } catch (enrichError: any) {
                         console.error('AI Enrichment failed:', enrichError);
-                        await supabase.from('contacts').update({
-                            metadata: {
-                                ...(currentContact?.metadata || {}),
-                                ai_error: enrichError.message || 'Unknown error during AI enrichment'
-                            }
-                        }).eq('id', currentContact.id);
                     }
                 }
             }

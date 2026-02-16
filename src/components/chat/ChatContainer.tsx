@@ -118,7 +118,10 @@ export default function ChatContainer() {
 
                         {/* Right Sidebar: AI Sales Coach */}
                         <div className="hidden lg:block w-80 xl:w-96 p-4 border-l border-[#2a2e3d] bg-[#0f1117]">
-                            <SalesCoach advice={activeContact?.metadata?.ai_sales_advice} />
+                            <SalesCoach
+                                advice={activeContact?.metadata?.ai_sales_advice}
+                                error={activeContact?.metadata?.ai_error}
+                            />
                         </div>
                     </>
                 ) : (
