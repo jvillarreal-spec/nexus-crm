@@ -129,6 +129,17 @@ export async function POST(request: NextRequest) {
                     try {
                         const ai = new AIService();
                         const contactToAnalyze = currentContact;
+
+                        // Check if API KEY is missing and report it via metadata
+                        if (!process.env.GOOGLE_GEMINI_API_KEY) {
+                            await supabase.from('contacts').update({
+                                metadata: {
+                                    ...(contactToAnalyze.metadata || {}),
+                                    ai_error: 'GOOGLE_GEMINI_API_KEY is missing in environment variables.'
+                                }
+                            }).eq('id', contactToAnalyze.id);
+                        }
+
                         const analysis = await ai.analyzeMessage(unifiedMessage.body, contactToAnalyze);
 
                         if (analysis) {
@@ -150,14 +161,29 @@ export async function POST(request: NextRequest) {
                                 ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
                                 ai_summary: analysis.extracted_data.summary,
                                 last_analysis_at: new Date().toISOString(),
-                                debug_last_ai_raw: analysis
+                                debug_last_ai_raw: analysis,
+                                ai_error: null // Clear previous errors
                             };
 
                             await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
                             console.log('Contact enriched by AI successfully');
+                        } else {
+                            // Logic reached but analysis was null
+                            await supabase.from('contacts').update({
+                                metadata: {
+                                    ...(contactToAnalyze.metadata || {}),
+                                    ai_error: 'AI analysis returned null (check prompt or API limits).'
+                                }
+                            }).eq('id', contactToAnalyze.id);
                         }
-                    } catch (enrichError) {
+                    } catch (enrichError: any) {
                         console.error('AI Enrichment failed:', enrichError);
+                        await supabase.from('contacts').update({
+                            metadata: {
+                                ...(currentContact?.metadata || {}),
+                                ai_error: enrichError.message || 'Unknown error during AI enrichment'
+                            }
+                        }).eq('id', currentContact.id);
                     }
                 }
             }

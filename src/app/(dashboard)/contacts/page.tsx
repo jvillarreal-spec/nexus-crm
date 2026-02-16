@@ -256,12 +256,21 @@ export default function ContactsPage() {
                                         <h3 className="text-xs font-bold uppercase tracking-wider">Etiquetas</h3>
                                     </div>
                                 </div>
+                                )}
+
+                                {/* Error Status */}
+                                {selectedContact.metadata?.ai_error && (
+                                    <div className="space-y-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                                        <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Error de IA Detectado</p>
+                                        <p className="text-xs text-red-400">{selectedContact.metadata.ai_error}</p>
+                                    </div>
+                                )}
 
                                 {/* Debug Section */}
                                 {selectedContact.metadata?.debug_last_ai_raw && (
-                                    <div className="space-y-3 p-4 bg-red-900/10 border border-red-500/20 rounded-xl">
-                                        <h3 className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Debug: Raw AI Response</h3>
-                                        <pre className="text-[10px] text-red-300/70 overflow-x-auto whitespace-pre-wrap">
+                                    <div className="space-y-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                                        <h3 className="text-[10px] font-bold text-[#8b8fa3] uppercase tracking-widest">Debug: Raw AI Response</h3>
+                                        <pre className="text-[10px] text-[#8b8fa3] overflow-x-auto whitespace-pre-wrap">
                                             {JSON.stringify(selectedContact.metadata.debug_last_ai_raw, null, 2)}
                                         </pre>
                                     </div>
