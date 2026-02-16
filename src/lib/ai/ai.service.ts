@@ -55,6 +55,7 @@ export class AIService {
             "first_name": "string o null",
             "last_name": "string o null",
             "email": "string o null",
+            "phone": "string o null",
             "company": "string o null",
             "budget": "string o null",
             "summary": "string"
