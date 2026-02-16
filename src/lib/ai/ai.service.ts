@@ -78,35 +78,48 @@ export class AIService {
         }
         `;
 
-        try {
-            console.log(`AI: Requesting analysis from ${modelName}...`);
-            // Primary model on v1
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+        const maxRetries = 2;
+        let attempt = 0;
 
-            const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
-            return JSON.parse(jsonText) as AIAnalysisResult;
-        } catch (error: any) {
-            console.warn(`AI: Primary model ${modelName} failed. Reason: ${error.message}`);
-
+        while (attempt <= maxRetries) {
             try {
-                console.log(`AI: Attempting fallback to ${fallbackName}...`);
-                // Fallback on v1beta as confirmed in discovery
-                const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
-                const result = await fallbackModel.generateContent(prompt);
+                console.log(`AI: Requesting analysis from ${modelName} (Attempt ${attempt + 1})...`);
+                const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
+                const result = await model.generateContent(prompt);
                 const response = await result.response;
                 const text = response.text();
 
                 const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
                 return JSON.parse(jsonText) as AIAnalysisResult;
-            } catch (fallbackError: any) {
-                if (fallbackError.message.includes('429')) {
-                    throw new Error(`[QUOTA_ERROR] Revisa los límites de tu llave en AI Studio.`);
+            } catch (error: any) {
+                console.warn(`AI: Primary model ${modelName} failed. Reason: ${error.message}`);
+
+                // If it's a 503, retry after a short delay
+                if (error.message.includes('503') && attempt < maxRetries) {
+                    attempt++;
+                    const delay = 1000 * attempt;
+                    console.log(`AI: 503 error, retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
                 }
-                throw new Error(`[AI_FAILURE] Primary (${modelName}) & Fallback (${fallbackName}) failed. Last error: ${fallbackError.message}`);
+
+                try {
+                    console.log(`AI: Attempting fallback to ${fallbackName}...`);
+                    const fallbackModel = genAI.getGenerativeModel({ model: fallbackName }, { apiVersion: "v1beta" });
+                    const result = await fallbackModel.generateContent(prompt);
+                    const response = await result.response;
+                    const text = response.text();
+
+                    const jsonText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+                    return JSON.parse(jsonText) as AIAnalysisResult;
+                } catch (fallbackError: any) {
+                    if (fallbackError.message.includes('429')) {
+                        throw new Error(`[QUOTA_ERROR] Revisa los límites de tu llave en AI Studio.`);
+                    }
+                    throw new Error(`[AI_FAILURE] Primary (${modelName}) & Fallback (${fallbackName}) failed. Last error: ${fallbackError.message}`);
+                }
             }
         }
+        throw new Error("AI: Internal loop error");
     }
 }
