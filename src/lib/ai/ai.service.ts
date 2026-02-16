@@ -28,7 +28,8 @@ export class AIService {
         }
 
         // Use discovered successful model names for this account
-        const primaryModel = "gemini-2.0-flash";
+        // 'lite' models usually have better quota on free tier
+        const primaryModel = "gemini-2.0-flash-lite";
         const fallbackModel = "gemini-flash-latest";
 
         return this.generateWithFallback(primaryModel, fallbackModel, message, currentData);
