@@ -149,7 +149,8 @@ export async function POST(request: NextRequest) {
                                 ...(analysis.extracted_data.company ? { company: analysis.extracted_data.company } : {}),
                                 ...(analysis.extracted_data.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
                                 ai_summary: analysis.extracted_data.summary,
-                                last_analysis_at: new Date().toISOString()
+                                last_analysis_at: new Date().toISOString(),
+                                debug_last_ai_raw: analysis // Store raw for debugging
                             };
 
                             await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);

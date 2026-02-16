@@ -39,12 +39,12 @@ export class AIService {
         
         INSTRUCCIONES:
         1. Analiza la intención (ventas, soporte, información, queja, saludo).
-        2. Extrae datos personales si se mencionan. 
-           IMPORTANTE: Si mencionan un número de teléfono o celular, extráelo en el campo "phone".
+        2. Extrae datos personales. 
+           CRÍTICO: "celular", "teléfono", "móvil", "whatsapp" son sinónimos. Si detectas un número de 7 a 15 dígitos, regístralo en "phone".
         3. Extrae nombre, email, empresa, presupuesto si se mencionan.
         4. Genera etiquetas útiles (ej: #Interesado, #Urgente, #LeadCalificado).
         5. Define el sentimiento del mensaje.
-        6. Crea un resumen cortísimo (máximo 15 palabras) de lo que quiere el cliente.
+        6. Crea un resumen cortísimo (máximo 15 palabras).
         
         RESPONDE ÚNICAMENTE EN FORMATO JSON SIGUIENDO ESTA ESTRUCTURA:
         {
