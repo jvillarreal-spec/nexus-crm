@@ -17,16 +17,21 @@ export default function ContextPage() {
     }, []);
 
     const fetchContext = async () => {
-        const { data, error } = await supabase
-            .from('organization_knowledge')
-            .select('content')
-            .limit(1)
-            .maybeSingle();
+        try {
+            const { data, error } = await supabase
+                .from('organization_knowledge')
+                .select('content')
+                .limit(1)
+                .maybeSingle();
 
-        if (error) {
-            console.error('Error fetching context:', error);
-        } else if (data) {
-            setContent(data.content);
+            if (error) {
+                console.error('Fetch error:', error);
+                // If it's a 42P01 (relation does not exist), keep loading false but content empty
+            } else if (data) {
+                setContent(data.content);
+            }
+        } catch (e) {
+            console.error('Unexpected fetch error:', e);
         }
         setLoading(false);
     };
@@ -35,31 +40,42 @@ export default function ContextPage() {
         setSaving(true);
         setMessage(null);
 
-        const { data: existing } = await supabase
-            .from('organization_knowledge')
-            .select('id')
-            .limit(1)
-            .maybeSingle();
-
-        let error;
-        if (existing) {
-            const { error: updateError } = await supabase
+        try {
+            const { data: existing, error: fetchExistingError } = await supabase
                 .from('organization_knowledge')
-                .update({ content, updated_at: new Date().toISOString() })
-                .eq('id', existing.id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase
-                .from('organization_knowledge')
-                .insert({ content });
-            error = insertError;
-        }
+                .select('id')
+                .limit(1)
+                .maybeSingle();
 
-        if (error) {
-            setMessage({ type: 'error', text: 'Error al guardar el contexto. Intenta de nuevo.' });
-        } else {
-            setMessage({ type: 'success', text: 'Contexto actualizado correctamente. La IA ahora usará esta información.' });
-            setTimeout(() => setMessage(null), 5000);
+            if (fetchExistingError) {
+                console.error('Fetch existing error:', fetchExistingError);
+                throw fetchExistingError;
+            }
+
+            let error;
+            if (existing) {
+                const { error: updateError } = await supabase
+                    .from('organization_knowledge')
+                    .update({ content, updated_at: new Date().toISOString() })
+                    .eq('id', existing.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('organization_knowledge')
+                    .insert({ content });
+                error = insertError;
+            }
+
+            if (error) {
+                console.error('Save error details:', error);
+                setMessage({ type: 'error', text: `Error al guardar: ${error.message || 'Intente de nuevo.'}` });
+            } else {
+                setMessage({ type: 'success', text: 'Contexto actualizado correctamente. La IA ahora usará esta información.' });
+                setTimeout(() => setMessage(null), 5000);
+            }
+        } catch (err: any) {
+            console.error('Critical save error:', err);
+            setMessage({ type: 'error', text: `Error crítico: ${err.message || 'Verifique la consola.'}` });
         }
         setSaving(false);
     };
@@ -100,8 +116,8 @@ export default function ContextPage() {
 
             {message && (
                 <div className={`p-4 rounded-xl text-sm font-medium border ${message.type === 'success'
-                        ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                        : 'bg-red-500/10 border-red-500/20 text-red-400'
+                    ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                    : 'bg-red-500/10 border-red-500/20 text-red-400'
                     }`}>
                     {message.text}
                 </div>
