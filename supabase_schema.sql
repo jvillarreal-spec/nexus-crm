@@ -48,6 +48,7 @@ CREATE TABLE public.conversations (
   status conversation_status DEFAULT 'open',
   unread_count INT DEFAULT 0,
   last_message_at TIMESTAMPTZ DEFAULT NOW(),
+  follow_up_at TIMESTAMPTZ, -- For 'pending' conversations
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

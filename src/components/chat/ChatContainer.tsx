@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Clock, CheckCircle2, RotateCcw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import ConversationList from './ConversationList';
@@ -15,10 +15,43 @@ export default function ChatContainer() {
     const [activeContact, setActiveContact] = useState<any | null>(null);
     const [conversationSummary, setConversationSummary] = useState<string | null>(null);
     const [showSummary, setShowSummary] = useState(true);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [followUpDate, setFollowUpDate] = useState('');
 
     const supabase = createClient();
     const searchParams = useSearchParams();
     const contactIdFromUrl = searchParams.get('contactId');
+
+    async function updateConversationStatus(status: string, followUpAt?: string) {
+        if (!selectedConversationId) return;
+        setIsUpdatingStatus(true);
+
+        const updateData: any = {
+            status,
+            updated_at: new Date().toISOString()
+        };
+
+        if (followUpAt) {
+            updateData.follow_up_at = followUpAt;
+        }
+
+        const { error } = await supabase
+            .from('conversations')
+            .update(updateData)
+            .eq('id', selectedConversationId);
+
+        if (error) {
+            console.error('Error updating status:', error);
+            alert('Error al actualizar el estado del chat');
+        } else {
+            setSelectedConversationId(null);
+            setActiveContact(null);
+            setShowDatePicker(false);
+        }
+        setIsUpdatingStatus(false);
+    }
 
     // Handle deep linking and metadata refresh
     useEffect(() => {
@@ -164,18 +197,71 @@ export default function ChatContainer() {
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    onClick={() => setShowSummary(!showSummary)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer",
-                                        showSummary
-                                            ? "bg-[#2AABEE] text-white border-[#2AABEE]"
-                                            : "bg-transparent text-[#8b8fa3] border-[#2a2e3d] hover:text-white"
+                                <div className="flex items-center gap-2 relative">
+                                    <button
+                                        onClick={() => setShowDatePicker(!showDatePicker)}
+                                        disabled={isUpdatingStatus}
+                                        className={cn(
+                                            "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50",
+                                            showDatePicker ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.3)]" : "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20"
+                                        )}
+                                        title="Marcar para seguimiento"
+                                    >
+                                        <Clock size={12} />
+                                        Seguimiento
+                                    </button>
+
+                                    {/* Date Picker Overlay */}
+                                    {showDatePicker && (
+                                        <div className="absolute top-full right-0 mt-2 p-4 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 w-64 animate-in zoom-in-95 duration-200">
+                                            <div className="text-[10px] font-black uppercase tracking-wider text-[#8b8fa3] mb-3">Programar Seguimiento</div>
+                                            <input
+                                                type="datetime-local"
+                                                value={followUpDate}
+                                                onChange={(e) => setFollowUpDate(e.target.value)}
+                                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#2AABEE] transition-all mb-4"
+                                            />
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setShowDatePicker(false)}
+                                                    className="flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase text-[#8b8fa3] hover:bg-[#232732]"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button
+                                                    onClick={() => updateConversationStatus('pending', followUpDate)}
+                                                    disabled={!followUpDate || isUpdatingStatus}
+                                                    className="flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-50"
+                                                >
+                                                    Agendar
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
-                                >
-                                    {showSummary ? "Ocultar" : "Resumen"}
-                                </button>
+
+                                    <button
+                                        onClick={() => updateConversationStatus('closed')}
+                                        disabled={isUpdatingStatus}
+                                        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 transition-all disabled:opacity-50"
+                                        title="Finalizar conversación"
+                                    >
+                                        <CheckCircle2 size={12} />
+                                        Finalizar
+                                    </button>
+                                    <div className="w-px h-4 bg-[#2a2e3d] mx-1 hidden sm:block" />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowSummary(!showSummary)}
+                                        className={cn(
+                                            "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer",
+                                            showSummary
+                                                ? "bg-[#2AABEE] text-white border-[#2AABEE]"
+                                                : "bg-transparent text-[#8b8fa3] border-[#2a2e3d] hover:text-white"
+                                        )}
+                                    >
+                                        {showSummary ? "Ocultar" : "Resumen"}
+                                    </button>
+                                </div>
                             </div>
 
                             {/* AI Summary Bar */}
