@@ -3,9 +3,11 @@ import { cn } from '@/lib/utils';
 import { Send, Paperclip, Zap, Search, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
+
 interface ChatInputProps {
     conversationId: string;
     contactId: string;
+    contactName?: string;
 }
 
 interface QuickReply {
@@ -13,25 +15,39 @@ interface QuickReply {
     title: string;
     shortcut: string;
     content: string;
+    category: string;
 }
 
-export default function ChatInput({ conversationId, contactId }: ChatInputProps) {
+export default function ChatInput({ conversationId, contactId, contactName }: ChatInputProps) {
     const [text, setText] = useState('');
     const [sending, setSending] = useState(false);
     const [showQuickReplies, setShowQuickReplies] = useState(false);
     const [replies, setReplies] = useState<QuickReply[]>([]);
     const [loadingReplies, setLoadingReplies] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedIndex, setSelectedIndex] = useState(0);
 
     const popoverRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const supabase = createClient();
 
     // Fetch replies when popover opens
     useEffect(() => {
         if (showQuickReplies) {
             fetchQuickReplies();
+            setSelectedIndex(0);
         }
     }, [showQuickReplies]);
+
+    // Detect slash command
+    useEffect(() => {
+        if (text === '/') {
+            setShowQuickReplies(true);
+            setSearchQuery('');
+        } else if (showQuickReplies && text === '') {
+            setShowQuickReplies(false);
+        }
+    }, [text]);
 
     // Close popover on click outside
     useEffect(() => {
@@ -48,7 +64,7 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
         setLoadingReplies(true);
         const { data, error } = await supabase
             .from('quick_replies')
-            .select('id, title, shortcut, content')
+            .select('id, title, shortcut, content, category')
             .order('title', { ascending: true });
 
         if (!error && data) {
@@ -58,9 +74,16 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
     };
 
     const handleSelectReply = (content: string) => {
-        setText(content);
+        // Replace placeholders like {{nombre}} or {{name}}
+        const personalizedContent = content.replace(/\{\{(nombre|name|first_name)\}\}/gi, contactName || 'cliente');
+
+        setText(personalizedContent);
         setShowQuickReplies(false);
-        // Focus textarea if needed (usually happens automatically via state update)
+
+        // Focus textarea after selection
+        setTimeout(() => {
+            textareaRef.current?.focus();
+        }, 10);
     };
 
     const handleSendMessage = async (e?: React.FormEvent) => {
@@ -117,6 +140,29 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
         r.shortcut?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (showQuickReplies) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev + 1) % filteredReplies.length);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev - 1 + filteredReplies.length) % filteredReplies.length);
+            } else if (e.key === 'Enter' && filteredReplies.length > 0) {
+                e.preventDefault();
+                handleSelectReply(filteredReplies[selectedIndex].content);
+            } else if (e.key === 'Escape') {
+                setShowQuickReplies(false);
+            }
+            return;
+        }
+
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    };
+
     return (
         <div className="relative max-w-5xl mx-auto">
             {/* Quick Replies Popover */}
@@ -134,7 +180,8 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
                                 placeholder="Buscar respuesta..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-lg py-1.5 pl-9 pr-3 text-xs text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all"
+                                onKeyDown={handleKeyDown}
+                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-lg py-1.5 pl-9 pr-3 text-xs text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all font-medium"
                             />
                         </div>
                     </div>
@@ -145,16 +192,26 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
                                 <Loader2 size={16} className="animate-spin text-[#2AABEE]" />
                             </div>
                         ) : filteredReplies.length > 0 ? (
-                            filteredReplies.map((reply) => (
+                            filteredReplies.map((reply, idx) => (
                                 <button
                                     key={reply.id}
                                     onClick={() => handleSelectReply(reply.content)}
-                                    className="w-full text-left p-2.5 hover:bg-[#232732] rounded-xl transition-all group"
+                                    onMouseEnter={() => setSelectedIndex(idx)}
+                                    className={cn(
+                                        "w-full text-left p-2.5 rounded-xl transition-all group",
+                                        selectedIndex === idx ? "bg-[#2AABEE]/10 border border-[#2AABEE]/20" : "hover:bg-[#232732] border border-transparent"
+                                    )}
                                 >
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[10px] font-bold text-white uppercase tracking-tight group-hover:text-[#2AABEE] transition-colors">
-                                            {reply.title}
-                                        </span>
+                                        <div className="flex flex-col">
+                                            <span className={cn(
+                                                "text-[10px] font-bold uppercase tracking-tight transition-colors",
+                                                selectedIndex === idx ? "text-[#2AABEE]" : "text-white group-hover:text-[#2AABEE]"
+                                            )}>
+                                                {reply.title}
+                                            </span>
+                                            <span className="text-[8px] text-[#4a4e5d] font-bold uppercase tracking-tighter">{reply.category || 'General'}</span>
+                                        </div>
                                         {reply.shortcut && (
                                             <span className="text-[9px] text-[#2AABEE] bg-[#2AABEE]/10 px-1.5 py-0.5 rounded font-bold">
                                                 {reply.shortcut}
@@ -210,17 +267,13 @@ export default function ChatInput({ conversationId, contactId }: ChatInputProps)
 
                 <div className="flex-1 relative">
                     <textarea
+                        ref={textareaRef}
                         rows={1}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage();
-                            }
-                        }}
+                        onKeyDown={handleKeyDown}
                         placeholder="Escribe un mensaje..."
-                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-[#2AABEE] resize-none overflow-hidden placeholder-[#4a4e5d]"
+                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-[#2AABEE] resize-none overflow-hidden placeholder-[#4a4e5d] transition-all"
                         style={{ minHeight: '48px', maxHeight: '150px' }}
                     />
                 </div>

@@ -112,7 +112,11 @@ export default function ChatContainer() {
 
                             {/* Input Area */}
                             <div className="p-4 bg-[#1a1d27]/50 backdrop-blur-md border-t border-[#2a2e3d]">
-                                <ChatInput conversationId={selectedConversationId} contactId={activeContact.id} />
+                                <ChatInput
+                                    conversationId={selectedConversationId}
+                                    contactId={activeContact.id}
+                                    contactName={activeContact.first_name}
+                                />
                             </div>
                         </div>
 

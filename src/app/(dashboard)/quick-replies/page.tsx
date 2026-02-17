@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Zap, Plus, Search, Trash2, Edit2, X, Loader2, Save } from 'lucide-react';
+import { Zap, Plus, Search, Trash2, Edit2, X, Loader2, Save, Tag } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface QuickReply {
@@ -10,8 +10,11 @@ interface QuickReply {
     title: string;
     shortcut: string;
     content: string;
+    category: string;
     created_at: string;
 }
+
+const CATEGORIES = ['General', 'Ventas', 'Soporte', 'Saludos', 'Despedidas'];
 
 export default function QuickRepliesPage() {
     const [replies, setReplies] = useState<QuickReply[]>([]);
@@ -19,12 +22,14 @@ export default function QuickRepliesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingReply, setEditingReply] = useState<QuickReply | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('Todas');
 
     // Form state
     const [formData, setFormData] = useState({
         title: '',
         shortcut: '',
-        content: ''
+        content: '',
+        category: 'General'
     });
 
     const supabase = createClient();
@@ -54,11 +59,12 @@ export default function QuickRepliesPage() {
             setFormData({
                 title: reply.title,
                 shortcut: reply.shortcut || '',
-                content: reply.content
+                content: reply.content,
+                category: reply.category || 'General'
             });
         } else {
             setEditingReply(null);
-            setFormData({ title: '', shortcut: '', content: '' });
+            setFormData({ title: '', shortcut: '', content: '', category: 'General' });
         }
         setIsModalOpen(true);
     };
@@ -67,16 +73,21 @@ export default function QuickRepliesPage() {
         e.preventDefault();
         setLoading(true);
 
+        const dataToSave = {
+            ...formData,
+            shortcut: formData.shortcut.startsWith('/') ? formData.shortcut : '/' + formData.shortcut
+        };
+
         if (editingReply) {
             const { error } = await supabase
                 .from('quick_replies')
-                .update(formData)
+                .update(dataToSave)
                 .eq('id', editingReply.id);
             if (error) console.error('Error updating:', error);
         } else {
             const { error } = await supabase
                 .from('quick_replies')
-                .insert([formData]);
+                .insert([dataToSave]);
             if (error) console.error('Error inserting:', error);
         }
 
@@ -96,11 +107,15 @@ export default function QuickRepliesPage() {
         fetchReplies();
     };
 
-    const filteredReplies = replies.filter(r =>
-        r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.shortcut?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredReplies = replies.filter(r => {
+        const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            r.shortcut?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesCategory = selectedCategory === 'Todas' || r.category === selectedCategory;
+
+        return matchesSearch && matchesCategory;
+    });
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
@@ -126,16 +141,32 @@ export default function QuickRepliesPage() {
                 </button>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d] group-focus-within:text-[#2AABEE] transition-colors" size={18} />
-                <input
-                    type="text"
-                    placeholder="Buscar por título, contenido o atajo..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-[#1a1d27] border border-[#2a2e3d] rounded-xl py-3 pl-12 pr-4 text-white placeholder-[#4a4e5d] focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
-                />
+            {/* Toolbar: Search & Category Filter */}
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative group flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d] group-focus-within:text-[#2AABEE] transition-colors" size={18} />
+                    <input
+                        type="text"
+                        placeholder="Buscar por título, contenido o atajo..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-[#1a1d27] border border-[#2a2e3d] rounded-xl py-3 pl-12 pr-4 text-white placeholder-[#4a4e5d] focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
+                    />
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                    {['Todas', ...CATEGORIES].map((cat) => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${selectedCategory === cat
+                                    ? 'bg-[#2AABEE] border-[#2AABEE] text-white shadow-lg shadow-[#2AABEE]/20'
+                                    : 'bg-[#1a1d27] border-[#2a2e3d] text-[#8b8fa3] hover:border-[#3a3f4e] hover:text-white'
+                                }`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {loading && replies.length === 0 ? (
@@ -148,7 +179,10 @@ export default function QuickRepliesPage() {
                     {filteredReplies.map((reply) => (
                         <div key={reply.id} className="bg-[#1a1d27] border border-[#2a2e3d] rounded-xl p-5 hover:border-[#3a3f4e] transition-all group relative">
                             <div className="flex justify-between items-start mb-3">
-                                <h3 className="text-sm font-bold text-white group-hover:text-[#2AABEE] transition-colors uppercase tracking-tight">{reply.title}</h3>
+                                <div>
+                                    <h3 className="text-sm font-bold text-white group-hover:text-[#2AABEE] transition-colors uppercase tracking-tight">{reply.title}</h3>
+                                    <span className="text-[9px] text-[#4a4e5d] font-bold uppercase tracking-widest">{reply.category || 'General'}</span>
+                                </div>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => handleOpenModal(reply)}
@@ -169,12 +203,14 @@ export default function QuickRepliesPage() {
                                 "{reply.content}"
                             </p>
 
-                            {reply.shortcut && (
-                                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-[#2AABEE]/10 border border-[#2AABEE]/20 text-[#2AABEE] text-[10px] font-bold">
-                                    <Zap size={10} />
-                                    {reply.shortcut}
-                                </div>
-                            )}
+                            <div className="flex justify-between items-center">
+                                {reply.shortcut && (
+                                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-[#2AABEE]/10 border border-[#2AABEE]/20 text-[#2AABEE] text-[10px] font-bold">
+                                        <Zap size={10} />
+                                        {reply.shortcut}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -183,9 +219,9 @@ export default function QuickRepliesPage() {
                     <Zap size={48} className="text-[#2AABEE] mb-4 opacity-10" />
                     <h3 className="text-lg font-medium text-white mb-2">No se encontraron respuestas</h3>
                     <p className="text-[#8b8fa3] text-sm max-w-xs mb-6">
-                        {searchTerm ? 'Prueba con otros términos de búsqueda.' : 'Crea tu primera respuesta rápida para ahorrar tiempo.'}
+                        {searchTerm || selectedCategory !== 'Todas' ? 'Prueba con otros términos o filtros.' : 'Crea tu primera respuesta rápida para ahorrar tiempo.'}
                     </p>
-                    {!searchTerm && (
+                    {!searchTerm && selectedCategory === 'Todas' && (
                         <button
                             onClick={() => handleOpenModal()}
                             className="text-[#2AABEE] text-sm font-semibold hover:underline"
@@ -208,44 +244,58 @@ export default function QuickRepliesPage() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSave} className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Título</label>
-                                <input
-                                    required
-                                    type="text"
-                                    placeholder="Ej: Saludo Inicial"
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
-                                />
+                        <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Título</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Ej: Saludo"
+                                        value={formData.title}
+                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Atajo</label>
+                                    <input
+                                        type="text"
+                                        placeholder="/hola"
+                                        value={formData.shortcut}
+                                        onChange={(e) => setFormData({ ...formData, shortcut: e.target.value })}
+                                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
+                                    />
+                                </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Atajo (Opcional)</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d] text-sm font-bold">/</span>
-                                    <input
-                                        type="text"
-                                        placeholder="ej: precios"
-                                        value={formData.shortcut.replace(/^\//, '')}
-                                        onChange={(e) => setFormData({ ...formData, shortcut: '/' + e.target.value.replace(/^\//, '') })}
-                                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 pl-7 pr-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm"
-                                    />
-                                </div>
-                                <p className="text-[10px] text-[#4a4e5d] mt-1 ml-1">Te ayuda a identificarla visualmente.</p>
+                                <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Categoría</label>
+                                <select
+                                    value={formData.category}
+                                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                    className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm appearance-none"
+                                >
+                                    {CATEGORIES.map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-[#8b8fa3] uppercase mb-1.5 ml-1">Contenido del Mensaje</label>
                                 <textarea
                                     required
-                                    rows={4}
-                                    placeholder="Escribe el mensaje completo aquí..."
+                                    rows={5}
+                                    placeholder="Escribe el mensaje completo aquí... Usa {{nombre}} para personalizar."
                                     value={formData.content}
                                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                     className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all text-sm resize-none"
                                 />
+                                <p className="text-[10px] text-[#4a4e5d] mt-1 ml-1 flex items-center gap-1">
+                                    <Tag size={10} />
+                                    Tip: Usa <b>{"{{nombre}}"}</b> para insertar el nombre del cliente.
+                                </p>
                             </div>
 
                             <div className="pt-2">
