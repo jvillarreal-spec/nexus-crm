@@ -243,9 +243,9 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
 
             <form
                 onSubmit={handleSendMessage}
-                className="flex items-end gap-1.5 md:gap-2"
+                className="flex items-end gap-1.5 md:gap-2 flex-nowrap"
             >
-                <div className="flex items-center">
+                <div className="flex items-center flex-shrink-0">
                     <button
                         type="button"
                         onClick={() => setShowQuickReplies(!showQuickReplies)}
@@ -265,7 +265,7 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                     </button>
                 </div>
 
-                <div className="flex-1 relative">
+                <div className="flex-1 min-w-0 relative">
                     <textarea
                         ref={textareaRef}
                         rows={1}
@@ -282,7 +282,7 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                     type="submit"
                     disabled={!text.trim() || sending}
                     className={cn(
-                        "p-3.5 md:p-3 rounded-2xl transition-all active:scale-95",
+                        "p-3.5 md:p-3 rounded-2xl transition-all active:scale-95 flex-shrink-0",
                         text.trim() && !sending
                             ? "bg-[#2AABEE] text-white hover:bg-[#2AABEE]/90 shadow-lg shadow-[#2AABEE]/20"
                             : "bg-[#232732] text-[#4a4e5d] cursor-not-allowed"
