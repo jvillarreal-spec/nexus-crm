@@ -175,7 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="ml-4 text-lg font-bold">NexusCRM</span>
                 </div>
 
-                <div className="flex-1 overflow-auto bg-[#0f1117]">
+                <div className="flex-1 overflow-auto bg-[#0f1117] p-4 lg:p-8">
                     {children}
                 </div>
             </main>
