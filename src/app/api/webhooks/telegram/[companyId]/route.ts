@@ -130,13 +130,15 @@ export async function POST(
                 const adapter = new TelegramAdapter(company.telegram_token);
                 const userInput = unifiedMessage.body.toLowerCase().trim();
 
-                // Get Knowledge Base
-                const { data: knowledge } = await supabase
-                    .from('organization_knowledge')
-                    .select('content')
-                    .eq('company_id', companyId)
-                    .maybeSingle();
-                const businessContext = knowledge?.content || "";
+                // Get Knowledge Base & Company Config
+                const { data: companyDetails } = await supabase
+                    .from('companies')
+                    .select('support_email, organization_knowledge(content)')
+                    .eq('id', companyId)
+                    .single();
+
+                const businessContext = (companyDetails?.organization_knowledge as any)?.[0]?.content || "";
+                const supportDestEmail = companyDetails?.support_email || 'soporte@nexuscrm.ai';
 
                 // 1. /start or Hello -> Initial Menu
                 if (userInput === '/start' || userInput === 'hola' || userInput === 'menú') {
@@ -194,7 +196,7 @@ export async function POST(
 
                     // Generate "Email" in logs (as requested)
                     console.log(`[SUPPORT EMAIL SIMULATION]
-                        Para: soporte@nexuscrm.ai
+                        Para: ${supportDestEmail}
                         Cliente: ${currentContact.first_name} ${currentContact.last_name || ''}
                         Email: ${currentContact.email || 'No proporcionado'}
                         Tel: ${currentContact.phone || 'No proporcionado'}

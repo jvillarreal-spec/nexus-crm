@@ -147,3 +147,18 @@ export async function updateCompanyBot(companyId: string, token: string, secret:
         return { success: false, error: error.message };
     }
 }
+
+export async function updateSupportEmail(companyId: string, email: string) {
+    try {
+        const { error } = await supabaseAdmin
+            .from('companies')
+            .update({ support_email: email, updated_at: new Date().toISOString() })
+            .eq('id', companyId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating support email:', error);
+        return { success: false, error: error.message };
+    }
+}

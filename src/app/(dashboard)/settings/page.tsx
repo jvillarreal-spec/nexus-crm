@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { updateCompanyBot } from '@/app/actions/admin';
+import { updateCompanyBot, updateSupportEmail } from '@/app/actions/admin';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -18,6 +18,9 @@ export default function SettingsPage() {
     const [botToken, setBotToken] = useState('');
     const [botSecret, setBotSecret] = useState('');
 
+    // Notification State
+    const [supportEmail, setSupportEmail] = useState('');
+
     useEffect(() => {
         async function loadData() {
             const { data: { user } } = await supabase.auth.getUser();
@@ -31,6 +34,7 @@ export default function SettingsPage() {
                 if (profileData?.companies) {
                     setBotToken(profileData.companies.telegram_token || '');
                     setBotSecret(profileData.companies.telegram_secret_token || '');
+                    setSupportEmail(profileData.companies.support_email || '');
                 }
             }
             setLoading(false);
@@ -49,6 +53,21 @@ export default function SettingsPage() {
             setMessage({ type: 'success', text: 'Configuración de Bot actualizada y Webhook registrado con éxito.' });
         } else {
             setMessage({ type: 'error', text: result.error || 'Error al actualizar el bot.' });
+        }
+        setSaving(false);
+    };
+
+    const handleSaveNotifications = async () => {
+        if (!profile?.company_id) return;
+        setSaving(true);
+        setMessage(null);
+
+        const result = await updateSupportEmail(profile.company_id, supportEmail);
+
+        if (result.success) {
+            setMessage({ type: 'success', text: 'Configuración de notificaciones guardada con éxito.' });
+        } else {
+            setMessage({ type: 'error', text: result.error || 'Error al guardar notificaciones.' });
         }
         setSaving(false);
     };
@@ -74,14 +93,21 @@ export default function SettingsPage() {
                         onClick={() => setActiveTab('profile')}
                     />
                     {isAdmin && (
-                        <TabItem
-                            icon={<MessageCircle size={18} />}
-                            label="Canales (Telegram)"
-                            active={activeTab === 'channels'}
-                            onClick={() => setActiveTab('channels')}
-                        />
+                        <>
+                            <TabItem
+                                icon={<MessageCircle size={18} />}
+                                label="Canales (Telegram)"
+                                active={activeTab === 'channels'}
+                                onClick={() => setActiveTab('channels')}
+                            />
+                            <TabItem
+                                icon={<Bell size={18} />}
+                                label="Notificaciones"
+                                active={activeTab === 'notifications'}
+                                onClick={() => setActiveTab('notifications')}
+                            />
+                        </>
                     )}
-                    <TabItem icon={<Bell size={18} />} label="Notificaciones" disabled />
                     <TabItem icon={<Shield size={18} />} label="Seguridad" disabled />
                 </div>
 
@@ -115,6 +141,61 @@ export default function SettingsPage() {
                                 </div>
                                 <button className="bg-[#2AABEE] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-[#2AABEE]/20 hover:scale-105 transition-all">
                                     Guardar Perfil
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'notifications' && (
+                        <div className="bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] p-8 shadow-xl">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Bell className="text-[#2AABEE]" />
+                                        Configuración de Notificaciones
+                                    </h3>
+                                    <p className="text-sm text-[#8b8fa3] mt-2 max-w-md">
+                                        Gestiona cómo recibes las alertas de soporte y los leads del sistema.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex gap-3 text-blue-400">
+                                    <AlertCircle className="shrink-0" size={20} />
+                                    <p className="text-xs font-bold leading-relaxed">
+                                        Esta dirección de correo recibirá los reportes de problemas enviados por los clientes a través del bot de Telegram.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black uppercase tracking-widest text-[#4a4e5d] mb-2">Correo de Soporte</label>
+                                    <input
+                                        type="email"
+                                        value={supportEmail}
+                                        onChange={(e) => setSupportEmail(e.target.value)}
+                                        placeholder="soporte@tuempresa.com"
+                                        className="w-full bg-[#11131c] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-colors"
+                                    />
+                                </div>
+
+                                {message && (
+                                    <div className={cn(
+                                        "p-4 rounded-xl flex items-center gap-2 text-sm font-bold animate-in slide-in-from-top-2",
+                                        message.type === 'success' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                                    )}>
+                                        {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                        {message.text}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleSaveNotifications}
+                                    disabled={saving}
+                                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#2AABEE] disabled:bg-[#2AABEE]/50 text-white px-8 py-3 rounded-xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                >
+                                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                                    {saving ? 'Guardando...' : 'Guardar Configuración'}
                                 </button>
                             </div>
                         </div>
