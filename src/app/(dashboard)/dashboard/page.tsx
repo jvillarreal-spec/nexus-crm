@@ -53,21 +53,38 @@ export default function Dashboard() {
     }, [dateRange]);
 
     const fetchInitialData = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*, companies(*)')
-                .eq('id', user.id)
-                .single();
-            setProfile(profileData);
-            fetchDashboardData(profileData);
+        setLoading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('*, companies(*)')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profileData) {
+                    setProfile(profileData);
+                    await fetchDashboardData(profileData);
+                } else {
+                    console.warn('Profile not found for authenticated user');
+                    setLoading(false);
+                }
+            } else {
+                setLoading(false);
+            }
+        } catch (error) {
+            console.error('Error in fetchInitialData:', error);
+            setLoading(false);
         }
     };
 
     const fetchDashboardData = async (userProfile: any) => {
-        if (!userProfile) return;
-        setLoading(true);
+        if (!userProfile) {
+            setLoading(false);
+            return;
+        }
+        // ... (rest of the logic remains, will be updated to handle errors inside)
         try {
             const companyId = userProfile?.company_id;
             const isSuper = userProfile?.role === 'super_admin';
