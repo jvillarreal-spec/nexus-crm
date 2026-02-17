@@ -6,9 +6,9 @@ import { AIService } from '@/lib/ai/ai.service';
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { companyId: string } }
+    { params }: { params: Promise<{ companyId: string }> }
 ) {
-    const { companyId } = params;
+    const { companyId } = await params;
     console.log(`--- Multi-Tenant Telegram Webhook: Company ${companyId} ---`);
 
     try {
