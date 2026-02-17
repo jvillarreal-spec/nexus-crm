@@ -138,15 +138,24 @@ export default function ChatContainer() {
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setShowSummary(!showSummary)}
-                                    className={cn(
-                                        "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
-                                        showSummary ? "bg-[#2AABEE]/20 text-[#2AABEE] border border-[#2AABEE]/30" : "bg-[#1a1d27] text-[#8b8fa3] border border-[#2a2e3d]"
-                                    )}
-                                >
-                                    {showSummary ? "Ocultar Resumen" : "Ver Resumen"}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setShowSummary(prev => !prev);
+                                        }}
+                                        className={cn(
+                                            "relative z-20 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
+                                            showSummary
+                                                ? "bg-[#2AABEE]/15 text-[#2AABEE] border-[#2AABEE]/30 hover:bg-[#2AABEE]/25 whitespace-nowrap"
+                                                : "bg-[#1a1d27] text-[#8b8fa3] border-[#2a2e3d] hover:text-white whitespace-nowrap"
+                                        )}
+                                    >
+                                        {showSummary ? "Ocultar Resumen" : "Ver Resumen"}
+                                    </button>
+                                </div>
                             </div>
 
                             {/* AI Summary Bar */}
