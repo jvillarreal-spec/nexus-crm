@@ -125,33 +125,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     })}
                 </nav>
 
-                <div className="p-6 border-t border-[#2a2e3d] bg-[#1a1d27]">
-                    <div className="flex items-center gap-3 px-2 mb-6">
-                        <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-[#232732] flex items-center justify-center text-sm font-bold text-[#2AABEE] border border-[#2AABEE]/20 shadow-lg shadow-[#2AABEE]/5">
-                                {profile?.full_name?.[0] || profile?.email?.[0]?.toUpperCase() || 'U'}
-                            </div>
-                            {profile?.role === 'super_admin' && (
-                                <div className="absolute -top-1 -right-1 bg-[#2AABEE] text-white p-1 rounded-full shadow-lg">
-                                    <Crown size={10} />
+                {/* User Profile & Logout */}
+                <div className="mt-auto p-4 border-t border-[#2a2e3d]/50 bg-[#1a1d27]/40 backdrop-blur-xl">
+                    <div className="bg-[#232732]/30 rounded-[1.5rem] p-4 border border-[#2a2e3d]/30">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="relative flex-shrink-0">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#2AABEE] to-[#06b6d4] p-[1px]">
+                                    <div className="w-full h-full rounded-xl bg-[#1a1d27] flex items-center justify-center text-sm font-black text-white">
+                                        {profile?.full_name?.[0] || profile?.email?.[0]?.toUpperCase() || 'U'}
+                                    </div>
                                 </div>
-                            )}
+                                {profile?.role === 'super_admin' && (
+                                    <div className="absolute -top-1 -right-1 bg-[#2AABEE] text-white p-1 rounded-full shadow-lg border-2 border-[#1a1d27]">
+                                        <Crown size={8} />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-black text-white truncate leading-tight">
+                                    {profile?.full_name || 'Usuario'}
+                                </p>
+                                <p className="text-[9px] text-[#2AABEE] font-black uppercase tracking-[0.1em] mt-0.5">
+                                    {profile?.role === 'super_admin' ? 'Super Administrador' : profile?.role === 'org_admin' ? 'Administrador' : 'Asesor Comercial'}
+                                </p>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-sm font-bold text-white truncate">{profile?.full_name || 'Usuario'}</p>
-                            <p className="text-[10px] text-[#2AABEE] font-black uppercase tracking-widest bg-[#2AABEE]/10 px-1.5 py-0.5 rounded-md inline-block">
-                                {profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'org_admin' ? 'Admin' : 'Comercial'}
-                            </p>
-                        </div>
-                    </div>
 
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-[#8b8fa3] hover:text-white hover:bg-[#ef4444]/10 border border-transparent hover:border-[#ef4444]/20 transition-all group"
-                    >
-                        <LogOut size={18} className="group-hover:text-[#ef4444]" />
-                        <span>Cerrar sesión</span>
-                    </button>
+                        <button
+                            onClick={handleLogout}
+                            className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-[#ef4444] bg-[#ef4444]/5 hover:bg-[#ef4444]/10 border border-[#ef4444]/10 hover:border-[#ef4444]/20 transition-all duration-300 active:scale-[0.97]"
+                        >
+                            <LogOut size={14} />
+                            <span>Cerrar sesión</span>
+                        </button>
+                    </div>
                 </div>
             </aside>
 
