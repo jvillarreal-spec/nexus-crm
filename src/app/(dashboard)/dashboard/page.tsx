@@ -58,7 +58,6 @@ export default function Dashboard() {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            console.log('--- DASHBOARD AUTH DEBUG ---', user?.id);
             if (user) {
                 setAuthId(user.id);
                 const { data: profileData } = await supabase
@@ -266,17 +265,6 @@ export default function Dashboard() {
                     >
                         <Activity size={18} className={loading ? "animate-spin" : ""} />
                     </button>
-                </div>
-            </div>
-
-            {/* Inspección Técnica */}
-            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
-                <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-2">Inspección de Sesión</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-[10px] font-mono text-[#8b8fa3]">
-                    <div>AuthID (Raw): <span className="text-white">{authId || 'Buscando...'}</span></div>
-                    <div>Rol: <span className="text-white">{profile?.role || 'Sin rol'}</span></div>
-                    <div>EmpresaID: <span className="text-white">{profile?.company_id || 'SIN PERFIL'}</span></div>
-                    <div>Error: <span className="text-red-400 font-bold">{debugError || 'Ninguno'}</span></div>
                 </div>
             </div>
 
