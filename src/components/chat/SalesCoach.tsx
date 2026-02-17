@@ -2,7 +2,8 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, MessageSquare, Target, ShieldCheck, Copy, Check, Lightbulb } from 'lucide-react';
+import { Sparkles, MessageSquare, Target, ShieldCheck, Copy, Check, Lightbulb, RotateCcw, Clock, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 interface SalesAdviceProps {
@@ -11,6 +12,7 @@ interface SalesAdviceProps {
         next_step: string;
         objection_handling?: string;
         suggested_replies: string[];
+        suggested_status?: 'open' | 'pending' | 'closed';
     } | null;
     error?: string | null;
 }
@@ -90,6 +92,34 @@ export function SalesCoach({ advice, error }: SalesAdviceProps) {
                         {advice.next_step}
                     </div>
                 </section>
+
+                {/* Smart Transition Suggestion */}
+                {advice.suggested_status && advice.suggested_status !== 'open' && (
+                    <section className="space-y-2">
+                        <div className="flex items-center gap-2 text-[#8b8fa3]">
+                            <RotateCcw size={14} className="text-[#2AABEE]" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider">Trancisión Inteligente</span>
+                        </div>
+                        <div className={cn(
+                            "p-3 rounded-xl border flex items-center justify-between gap-3",
+                            advice.suggested_status === 'pending'
+                                ? "bg-yellow-500/5 border-yellow-500/20 text-yellow-500"
+                                : "bg-green-500/5 border-green-500/20 text-green-500"
+                        )}>
+                            <div className="flex items-center gap-2">
+                                {advice.suggested_status === 'pending' ? <Clock size={16} /> : <CheckCircle2 size={16} />}
+                                <div className="text-xs font-semibold">
+                                    {advice.suggested_status === 'pending'
+                                        ? "Sugerido: Mover a Seguimiento"
+                                        : "Sugerido: Finalizar Chat"}
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md">
+                                Reacción AI
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* Objection Handling */}
                 {advice.objection_handling && (

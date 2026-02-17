@@ -43,14 +43,16 @@ export class AIService {
 
         TU TAREA:
         1. Extrae: intent (ventas, soporte, info, saludo), tags (array), first_name, last_name, email, phone, company, budget, summary.
-        2. Genera Coaching: insights (qué quiere realmente), next_step (acción sugerida), objection_handling (si aplica), suggested_replies (2 opciones cortas estilo WhatsApp).
-
+        2. Determina Estado Sugerido: "open" (sigamos hablando), "pending" (agendar seguimiento si pidió hablar después), o "closed" (si ya compró o dijo que no).
+        3. Genera Coaching: insights (qué quiere realmente), next_step (acción sugerida), objection_handling (si aplica), suggested_replies (2 opciones cortas estilo WhatsApp).
+ 
         RESPONDE ÚNICAMENTE CON ESTE FORMATO JSON:
         {
           "analysis": {
              "intent": "string",
              "tags": ["string"],
              "sentiment": "positive|neutral|negative",
+             "suggested_status": "open|pending|closed",
              "extracted_data": {
                 "first_name": "string|null", "last_name": "string|null", "email": "string|null", 
                 "phone": "string|null", "company": "string|null", "budget": "string|null", "summary": "string"

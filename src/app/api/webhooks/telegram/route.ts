@@ -183,7 +183,10 @@ export async function POST(request: NextRequest) {
                                     ...(analysis?.extracted_data?.company ? { company: analysis.extracted_data.company } : {}),
                                     ...(analysis?.extracted_data?.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
                                     ...(analysis?.extracted_data?.summary ? { ai_summary: analysis.extracted_data.summary } : {}),
-                                    ai_sales_advice: salesAdvice,
+                                    ai_sales_advice: {
+                                        ...salesAdvice,
+                                        suggested_status: analysis?.suggested_status || 'open'
+                                    },
                                     last_analysis_at: new Date().toISOString(),
                                     ai_error: null // Reset error on success
                                 };
