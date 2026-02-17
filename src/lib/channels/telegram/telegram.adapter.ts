@@ -18,49 +18,62 @@ export class TelegramAdapter implements ChannelAdapter {
      * Parse incoming webhook payload from Telegram
      */
     parseIncoming(rawPayload: any): UnifiedMessage | null {
-        // We only care about messages for now (not edited_message, etc.)
-        const message = rawPayload.message;
-        if (!message) return null;
+        // Handle normal messages or callback queries
+        const message = rawPayload.message || rawPayload.callback_query?.message;
+        const callbackQuery = rawPayload.callback_query;
 
-        const chatId = message.chat.id.toString();
-        const senderName = [message.from.first_name, message.from.last_name].filter(Boolean).join(' ');
-        const senderUsername = message.from.username;
+        if (!message && !callbackQuery) return null;
+
+        const effectiveMessage = message || {};
+        const from = callbackQuery ? callbackQuery.from : effectiveMessage.from;
+
+        if (!from) return null;
+
+        const chatId = (callbackQuery ? callbackQuery.message.chat.id : effectiveMessage.chat.id).toString();
+        const senderName = [from.first_name, from.last_name].filter(Boolean).join(' ');
+        const senderUsername = from.username;
 
         // Determine content type
         let contentType: UnifiedMessage['contentType'] = 'text';
         let body = '';
         let mediaUrl: string | undefined;
+        let callbackData: string | undefined;
+        let isCallback = false;
 
-        if (message.text) {
+        if (callbackQuery) {
+            isCallback = true;
+            contentType = 'callback';
+            callbackData = callbackQuery.data;
+            body = `[Bot Option: ${callbackData}]`;
+        } else if (effectiveMessage.text) {
             contentType = 'text';
-            body = message.text;
-        } else if (message.photo) {
+            body = effectiveMessage.text;
+        } else if (effectiveMessage.photo) {
             contentType = 'image';
-            // Get the largest photo
-            const photo = message.photo[message.photo.length - 1];
-            mediaUrl = photo.file_id; // For now store file_id, normally we'd fetch the URL
-            body = message.caption || '';
-        } else if (message.document) {
+            const photo = effectiveMessage.photo[effectiveMessage.photo.length - 1];
+            mediaUrl = photo.file_id;
+            body = effectiveMessage.caption || '';
+        } else if (effectiveMessage.document) {
             contentType = 'document';
-            mediaUrl = message.document.file_id;
-            body = message.caption || message.document.file_name || '';
-        } else if (message.voice || message.audio) {
+            mediaUrl = effectiveMessage.document.file_id;
+            body = effectiveMessage.caption || effectiveMessage.document.file_name || '';
+        } else if (effectiveMessage.voice || effectiveMessage.audio) {
             contentType = 'audio';
-            mediaUrl = (message.voice || message.audio).file_id;
-        } else if (message.video) {
+            mediaUrl = (effectiveMessage.voice || effectiveMessage.audio).file_id;
+        } else if (effectiveMessage.video) {
             contentType = 'video';
-            mediaUrl = message.video.file_id;
-            body = message.caption || '';
-        } else if (message.contact) {
+            mediaUrl = effectiveMessage.video.file_id;
+            body = effectiveMessage.caption || '';
+        } else if (effectiveMessage.contact) {
             contentType = 'contact';
-            body = JSON.stringify(message.contact);
-        } else if (message.sticker) {
+            body = JSON.stringify(effectiveMessage.contact);
+        } else if (effectiveMessage.sticker) {
             contentType = 'sticker';
-            mediaUrl = message.sticker.file_id;
+            mediaUrl = effectiveMessage.sticker.file_id;
         }
 
         return {
-            channelMessageId: message.message_id.toString(),
+            channelMessageId: (callbackQuery ? callbackQuery.id : effectiveMessage.message_id).toString(),
             channel: 'telegram',
             chatId,
             senderName,
@@ -68,7 +81,9 @@ export class TelegramAdapter implements ChannelAdapter {
             contentType,
             body,
             mediaUrl,
-            timestamp: new Date(message.date * 1000),
+            callbackData,
+            isCallback,
+            timestamp: new Date((callbackQuery ? callbackQuery.message.date : effectiveMessage.date) * 1000),
             rawPayload,
         };
     }

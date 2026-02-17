@@ -197,4 +197,50 @@ export class AIService {
             return "Error al generar el resumen automático.";
         }
     }
+
+    /**
+     * Responds to a specific query using the provided knowledge base.
+     */
+    async getKnowledgeResponse(query: string, knowledge: string, type: 'products' | 'prices'): Promise<string> {
+        const prompt = `
+        Eres el asistente virtual de NexusCRM. Tu objetivo es informar al cliente sobre ${type === 'products' ? 'nuestros productos' : 'nuestros precios'} basándote únicamente en la siguiente BASE DE CONOCIMIENTO.
+
+        BASE DE CONOCIMIENTO:
+        ${knowledge}
+
+        PREGUNTA DEL CLIENTE:
+        "${query}"
+
+        INSTRUCCIONES:
+        1. Sé amable, conciso y profesional.
+        2. Si la información no está en la base de conocimiento, dile que un asesor le dará más detalles en breve.
+        3. Usa formato HTML simple para Telegram (negritas con <b>, etc).
+        4. Responde en español.
+
+        RESPUESTA:
+        `;
+
+        const openAIKey = process.env.OPENAI_API_KEY;
+        const isUsingOpenAI = openAIKey && openAIKey.startsWith('sk-');
+
+        try {
+            if (isUsingOpenAI) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: "Eres un experto en atención al cliente." },
+                        { role: "user", content: prompt }
+                    ],
+                });
+                return completion.choices[0].message.content || "Lo siento, no pude obtener esa información.";
+            } else {
+                const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }, { apiVersion: "v1" });
+                const result = await model.generateContent(prompt);
+                return result.response.text().trim();
+            }
+        } catch (error) {
+            console.error("Knowledge Response Error:", error);
+            return "Lo siento, hubo un error al consultar la información. Un asesor te contactará pronto.";
+        }
+    }
 }

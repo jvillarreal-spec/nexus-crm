@@ -29,10 +29,12 @@ export interface UnifiedMessage {
     chatId: string; // The external ID (e.g., Telegram chat_id)
     senderName: string;
     senderUsername?: string;
-    contentType: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | 'contact' | 'sticker';
+    contentType: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | 'contact' | 'sticker' | 'callback';
     body: string;
     mediaUrl?: string;
     replyToId?: string;
+    callbackData?: string;
+    isCallback?: boolean;
     timestamp: Date;
     rawPayload: any;
 }
