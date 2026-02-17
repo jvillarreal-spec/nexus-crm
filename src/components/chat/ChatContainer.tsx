@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare, Clock, CheckCircle2, RotateCcw } from 'lucide-react';
+import { MessageSquare, Clock, CheckCircle2, RotateCcw, ChevronLeft, Info, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import ConversationList from './ConversationList';
@@ -16,6 +16,7 @@ export default function ChatContainer() {
     const [conversationSummary, setConversationSummary] = useState<string | null>(null);
     const [showSummary, setShowSummary] = useState(true);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [showMobileCoach, setShowMobileCoach] = useState(false);
 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [followUpDate, setFollowUpDate] = useState('');
@@ -147,7 +148,10 @@ export default function ChatContainer() {
     return (
         <div className="flex h-full overflow-hidden bg-[#0f1117]">
             {/* Sidebar: Conversation List */}
-            <div className="w-full md:w-80 border-r border-[#2a2e3d] flex flex-col bg-[#1a1d27]">
+            <div className={cn(
+                "w-full md:w-80 border-r border-[#2a2e3d] flex flex-col bg-[#1a1d27] transition-all duration-300",
+                selectedConversationId ? "hidden md:flex" : "flex"
+            )}>
                 <div className="p-4 border-b border-[#2a2e3d]">
                     <h2 className="text-xl font-bold text-white tracking-tight">Chats</h2>
                     <div className="mt-1 text-[10px] text-[#2AABEE] font-bold uppercase tracking-widest">
@@ -159,7 +163,6 @@ export default function ChatContainer() {
                         onSelect={(id: string, contact: any) => {
                             setSelectedConversationId(id);
                             setActiveContact(contact);
-                            // Also fetch summary if not already in contact metadata
                             supabase
                                 .from('conversations')
                                 .select('summary')
@@ -173,65 +176,83 @@ export default function ChatContainer() {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className={cn(
+                "flex-1 flex overflow-hidden",
+                !selectedConversationId && "hidden md:flex"
+            )}>
                 {selectedConversationId ? (
                     <>
                         {/* Center: Chat View */}
                         <div className="flex-1 flex flex-col bg-[#0f1117] relative">
                             {/* Chat Header */}
-                            <div className="h-16 px-6 border-b border-[#2a2e3d] flex items-center justify-between bg-[#1a1d27]/80 backdrop-blur-md z-10">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-[#232732] flex items-center justify-center font-bold text-[#2AABEE] border border-[#2AABEE]/20 shadow-lg shadow-[#2AABEE]/5">
+                            <div className="h-16 px-4 md:px-6 border-b border-[#2a2e3d] flex items-center justify-between bg-[#1a1d27]/80 backdrop-blur-md z-10">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                    {/* Back Button (Mobile Only) */}
+                                    <button
+                                        onClick={() => setSelectedConversationId(null)}
+                                        className="md:hidden p-2 -ml-2 text-[#8b8fa3] hover:text-white"
+                                    >
+                                        <ChevronLeft size={24} />
+                                    </button>
+
+                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#232732] flex items-center justify-center font-bold text-[#2AABEE] border border-[#2AABEE]/20 shadow-lg shadow-[#2AABEE]/5 shrink-0">
                                         {activeContact?.first_name?.[0] || 'U'}
                                     </div>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-white">
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-semibold text-white truncate">
                                             {activeContact?.first_name} {activeContact?.last_name || ''}
                                         </h3>
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                                            <p className="text-[11px] text-[#8b8fa3]">
+                                        <div className="flex items-center gap-1.5 leading-none">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0"></div>
+                                            <p className="text-[10px] text-[#8b8fa3] truncate">
                                                 @{activeContact?.username || 'user'}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 relative">
+                                <div className="flex items-center gap-1.5 md:gap-2 relative">
+                                    {/* Sales Coach Toggle (Mobile Only) */}
+                                    <button
+                                        onClick={() => setShowMobileCoach(true)}
+                                        className="lg:hidden p-2 text-[#2AABEE] bg-[#2AABEE]/10 rounded-lg"
+                                    >
+                                        <Info size={18} />
+                                    </button>
                                     <button
                                         onClick={() => setShowDatePicker(!showDatePicker)}
                                         disabled={isUpdatingStatus}
                                         className={cn(
-                                            "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50",
+                                            "flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all disabled:opacity-50 transition-all active:scale-95",
                                             showDatePicker ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.3)]" : "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 hover:bg-yellow-500/20"
                                         )}
                                         title="Marcar para seguimiento"
                                     >
-                                        <Clock size={12} />
-                                        Seguimiento
+                                        <Clock size={16} />
+                                        <span className="hidden sm:inline">Seguimiento</span>
                                     </button>
 
                                     {/* Date Picker Overlay */}
                                     {showDatePicker && (
-                                        <div className="absolute top-full right-0 mt-2 p-4 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 w-64 animate-in zoom-in-95 duration-200">
+                                        <div className="absolute top-full right-0 mt-2 p-4 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 w-72 md:w-64 animate-in zoom-in-95 duration-200">
                                             <div className="text-[10px] font-black uppercase tracking-wider text-[#8b8fa3] mb-3">Programar Seguimiento</div>
                                             <input
                                                 type="datetime-local"
                                                 value={followUpDate}
                                                 onChange={(e) => setFollowUpDate(e.target.value)}
-                                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#2AABEE] transition-all mb-4"
+                                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:border-[#2AABEE] transition-all mb-4"
                                             />
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => setShowDatePicker(false)}
-                                                    className="flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase text-[#8b8fa3] hover:bg-[#232732]"
+                                                    className="flex-1 px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase text-[#8b8fa3] hover:bg-[#232732]"
                                                 >
                                                     Cancelar
                                                 </button>
                                                 <button
                                                     onClick={() => updateConversationStatus('pending', followUpDate)}
                                                     disabled={!followUpDate || isUpdatingStatus}
-                                                    className="flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-50"
+                                                    className="flex-1 px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-50"
                                                 >
                                                     Agendar
                                                 </button>
@@ -242,11 +263,11 @@ export default function ChatContainer() {
                                     <button
                                         onClick={() => updateConversationStatus('closed')}
                                         disabled={isUpdatingStatus}
-                                        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 transition-all disabled:opacity-50"
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 transition-all disabled:opacity-50 active:scale-95"
                                         title="Finalizar conversación"
                                     >
-                                        <CheckCircle2 size={12} />
-                                        Finalizar
+                                        <CheckCircle2 size={16} />
+                                        <span className="hidden sm:inline">Finalizar</span>
                                     </button>
                                     <div className="w-px h-4 bg-[#2a2e3d] mx-1 hidden sm:block" />
                                     <button
@@ -304,13 +325,45 @@ export default function ChatContainer() {
                             </div>
                         </div>
 
-                        {/* Right Sidebar: AI Sales Coach */}
+                        {/* Right Sidebar: AI Sales Coach (Desktop) */}
                         <div className="hidden lg:block w-80 xl:w-96 p-4 border-l border-[#2a2e3d] bg-[#0f1117]">
                             <SalesCoach
                                 advice={activeContact?.metadata?.ai_sales_advice}
                                 error={activeContact?.metadata?.ai_error}
                             />
                         </div>
+
+                        {/* Mobile AI Sales Coach Drawer */}
+                        {showMobileCoach && (
+                            <div className="fixed inset-0 z-[100] lg:hidden animate-in fade-in duration-200">
+                                <div
+                                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                                    onClick={() => setShowMobileCoach(false)}
+                                />
+                                <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-sm bg-[#0f1117] shadow-2xl animate-in slide-in-from-right duration-300">
+                                    <div className="flex flex-col h-full">
+                                        <div className="p-4 border-b border-[#2a2e3d] flex items-center justify-between bg-[#1a1d27]">
+                                            <h3 className="font-bold text-white flex items-center gap-2">
+                                                <Info size={18} className="text-[#2AABEE]" />
+                                                AI Sales Coach
+                                            </h3>
+                                            <button
+                                                onClick={() => setShowMobileCoach(false)}
+                                                className="p-2 text-[#8b8fa3] hover:text-white"
+                                            >
+                                                <X size={20} />
+                                            </button>
+                                        </div>
+                                        <div className="flex-1 overflow-hidden p-4">
+                                            <SalesCoach
+                                                advice={activeContact?.metadata?.ai_sales_advice}
+                                                error={activeContact?.metadata?.ai_error}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-[#8b8fa3] space-y-4 bg-[#0f1117] bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">

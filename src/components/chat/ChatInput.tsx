@@ -169,7 +169,7 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
             {showQuickReplies && (
                 <div
                     ref={popoverRef}
-                    className="absolute bottom-full mb-3 left-0 w-80 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-2 duration-200"
+                    className="absolute bottom-full mb-3 left-0 w-[calc(100vw-32px)] md:w-80 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-2 duration-200"
                 >
                     <div className="p-3 border-b border-[#2a2e3d] bg-[#1a1d27]/80 backdrop-blur-sm">
                         <div className="relative">
@@ -181,12 +181,12 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-lg py-1.5 pl-9 pr-3 text-xs text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all font-medium"
+                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-lg py-2.5 pl-9 pr-3 text-sm text-white focus:outline-none focus:border-[#2AABEE]/50 transition-all font-medium"
                             />
                         </div>
                     </div>
 
-                    <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                    <div className="max-h-[50vh] md:max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-1">
                         {loadingReplies ? (
                             <div className="py-8 flex justify-center">
                                 <Loader2 size={16} className="animate-spin text-[#2AABEE]" />
@@ -198,7 +198,7 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                                     onClick={() => handleSelectReply(reply.content)}
                                     onMouseEnter={() => setSelectedIndex(idx)}
                                     className={cn(
-                                        "w-full text-left p-2.5 rounded-xl transition-all group",
+                                        "w-full text-left p-3 md:p-2.5 rounded-xl transition-all group",
                                         selectedIndex === idx ? "bg-[#2AABEE]/10 border border-[#2AABEE]/20" : "hover:bg-[#232732] border border-transparent"
                                     )}
                                 >
@@ -224,16 +224,16 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                                 </button>
                             ))
                         ) : (
-                            <div className="py-8 text-center text-[#4a4e5d] text-[10px] italic">
+                            <div className="py-12 text-center text-[#4a4e5d] text-xs italic">
                                 No se encontraron respuestas
                             </div>
                         )}
                     </div>
 
-                    <div className="p-2 border-t border-[#2a2e3d] bg-[#1a1d27]/80">
+                    <div className="p-3 border-t border-[#2a2e3d] bg-[#1a1d27]/80">
                         <a
                             href="/quick-replies"
-                            className="block text-center py-1.5 text-[10px] font-bold text-[#8b8fa3] hover:text-[#2AABEE] transition-colors"
+                            className="block text-center py-2 text-[10px] font-black text-[#8b8fa3] hover:text-[#2AABEE] tracking-widest transition-colors"
                         >
                             GESTIONAR RESPUESTAS
                         </a>
@@ -243,23 +243,23 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
 
             <form
                 onSubmit={handleSendMessage}
-                className="flex items-end gap-2"
+                className="flex items-end gap-1.5 md:gap-2"
             >
                 <div className="flex items-center">
                     <button
                         type="button"
                         onClick={() => setShowQuickReplies(!showQuickReplies)}
                         className={cn(
-                            "p-2.5 rounded-xl transition-all",
+                            "p-3 md:p-2.5 rounded-xl transition-all active:scale-90",
                             showQuickReplies ? "text-[#2AABEE] bg-[#2AABEE]/10" : "text-[#8b8fa3] hover:text-white hover:bg-[#232732]"
                         )}
                         title="Respuestas Rápidas"
                     >
-                        <Zap size={20} className={showQuickReplies ? "fill-[#2AABEE]" : ""} />
+                        <Zap size={22} className={showQuickReplies ? "fill-[#2AABEE]" : ""} />
                     </button>
                     <button
                         type="button"
-                        className="p-2.5 text-[#8b8fa3] hover:text-white hover:bg-[#232732] rounded-xl transition-all"
+                        className="hidden md:block p-2.5 text-[#8b8fa3] hover:text-white hover:bg-[#232732] rounded-xl transition-all"
                     >
                         <Paperclip size={20} />
                     </button>
@@ -273,8 +273,8 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                         onChange={(e) => setText(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Escribe un mensaje..."
-                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-2xl px-5 py-3 text-sm text-white focus:outline-none focus:border-[#2AABEE] resize-none overflow-hidden placeholder-[#4a4e5d] transition-all"
-                        style={{ minHeight: '48px', maxHeight: '150px' }}
+                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-2xl px-4 md:px-5 py-3.5 md:py-3 text-sm text-white focus:outline-none focus:border-[#2AABEE] resize-none overflow-hidden placeholder-[#4a4e5d] transition-all"
+                        style={{ minHeight: '52px', maxHeight: '150px' }}
                     />
                 </div>
 
@@ -282,13 +282,13 @@ export default function ChatInput({ conversationId, contactId, contactName }: Ch
                     type="submit"
                     disabled={!text.trim() || sending}
                     className={cn(
-                        "p-3 rounded-2xl transition-all",
+                        "p-3.5 md:p-3 rounded-2xl transition-all active:scale-95",
                         text.trim() && !sending
-                            ? "bg-[#2AABEE] text-white hover:bg-[#2AABEE]/90 shadow-lg shadow-[#2AABEE]/20 active:scale-95"
+                            ? "bg-[#2AABEE] text-white hover:bg-[#2AABEE]/90 shadow-lg shadow-[#2AABEE]/20"
                             : "bg-[#232732] text-[#4a4e5d] cursor-not-allowed"
                     )}
                 >
-                    <Send size={20} className={sending ? "animate-pulse" : ""} />
+                    <Send size={22} className={sending ? "animate-pulse" : ""} />
                 </button>
             </form>
         </div>

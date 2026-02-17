@@ -65,14 +65,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Link
                                 key={item.name}
                                 href={item.href}
+                                onClick={() => setSidebarOpen(false)}
                                 className={cn(
-                                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                                    "flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-bold transition-all active:scale-95",
                                     isActive
-                                        ? "bg-[#2AABEE]/10 text-[#2AABEE]"
+                                        ? "bg-[#2AABEE] text-white shadow-lg shadow-[#2AABEE]/20"
                                         : "text-[#8b8fa3] hover:bg-[#232732] hover:text-white"
                                 )}
                             >
-                                <item.icon size={20} />
+                                <item.icon size={22} className={cn(isActive ? "text-white" : "text-[#8b8fa3]")} />
                                 {item.name}
                             </Link>
                         );

@@ -109,7 +109,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
     return (
         <div
             ref={scrollRef}
-            className="absolute inset-0 overflow-y-auto p-6 space-y-4 scroll-smooth custom-scrollbar"
+            className="absolute inset-0 overflow-y-auto px-4 py-6 md:p-6 space-y-4 scroll-smooth custom-scrollbar"
         >
             {hasMore && (
                 <div className="flex justify-center pb-4">
