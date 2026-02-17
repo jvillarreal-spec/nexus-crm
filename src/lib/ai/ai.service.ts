@@ -59,13 +59,13 @@ export class AIService {
         }
         `;
 
-        return this.generateWithRetry(prompt, "gemini-1.5-flash");
+        return this.generateWithRetry(prompt, "gemini-2.0-flash");
     }
 
     private async generateWithRetry(prompt: string, modelName: string, attempt: number = 0): Promise<any> {
         const maxRetries = 3;
         try {
-            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1beta" });
+            const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const text = response.text();
