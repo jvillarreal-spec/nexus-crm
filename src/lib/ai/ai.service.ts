@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
 
+// Version tag: 2026-02-16-v2
 export interface AIAnalysisResult {
     intent: string;
     tags: string[];
