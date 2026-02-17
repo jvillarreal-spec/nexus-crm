@@ -178,14 +178,24 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
-                                    <p className="text-[#8b8fa3] truncate pr-2 italic">
-                                        {conv.follow_up_at && activeTab === 'pending' ? 'Seguimiento programado' : 'Nueva conversación por Telegram'}
-                                    </p>
-                                    {conv.unread_count > 0 && (
-                                        <span className="bg-[#2AABEE] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                                            {conv.unread_count}
-                                        </span>
-                                    )}
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <p className="text-[#8b8fa3] truncate italic">
+                                            {conv.follow_up_at && activeTab === 'pending' ? 'Seguimiento programado' : 'Nueva conversación por Telegram'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {/* SLA Warning: More than 15 mins unread */}
+                                        {conv.unread_count > 0 && conv.last_message_at && (new Date().getTime() - new Date(conv.last_message_at).getTime() > 15 * 60 * 1000) && (
+                                            <span className="bg-orange-500/20 text-orange-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-orange-500/30 animate-pulse">
+                                                ALERTA SLA
+                                            </span>
+                                        )}
+                                        {conv.unread_count > 0 && (
+                                            <span className="bg-[#2AABEE] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-lg shadow-[#2AABEE]/20">
+                                                {conv.unread_count}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </button>

@@ -13,10 +13,10 @@ export async function POST(request: Request) {
 
         const supabase = await createClient();
 
-        // 1. Get contact details (channel_id is the Telegram chat_id)
+        // 1. Get contact details and company token
         const { data: contact, error: contactError } = await supabase
             .from('contacts')
-            .select('channel_id')
+            .select('channel_id, company_id, companies(telegram_token)')
             .eq('id', contactId)
             .single();
 
@@ -25,8 +25,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
         }
 
-        // 2. Send message via Telegram Adapter
-        const telegram = new TelegramAdapter();
+        const companyToken = (contact.companies as any)?.telegram_token;
+
+        // 2. Send message via Telegram Adapter with company-specific token
+        const telegram = new TelegramAdapter(companyToken);
 
         // Use sendTextMessage instead of sendMessage
         try {

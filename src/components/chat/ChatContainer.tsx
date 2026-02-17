@@ -2,13 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageSquare, Clock, CheckCircle2, RotateCcw, ChevronLeft, Info, X } from 'lucide-react';
+import {
+    MessageSquare,
+    Clock,
+    CheckCircle2,
+    RotateCcw,
+    ChevronLeft,
+    Info,
+    X,
+    UserPlus,
+    Shield,
+    ChevronRight,
+    Users
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { SalesCoach } from './SalesCoach';
+import { transferConversation } from '@/app/actions/admin';
 
 export default function ChatContainer() {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -17,6 +30,9 @@ export default function ChatContainer() {
     const [showSummary, setShowSummary] = useState(true);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showMobileCoach, setShowMobileCoach] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
+    const [companyAgents, setCompanyAgents] = useState<any[]>([]);
 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [followUpDate, setFollowUpDate] = useState('');
@@ -24,6 +40,48 @@ export default function ChatContainer() {
     const supabase = createClient();
     const searchParams = useSearchParams();
     const contactIdFromUrl = searchParams.get('contactId');
+
+    useEffect(() => {
+        async function fetchInitialData() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+                setProfile(profileData);
+
+                if (profileData && (profileData.role === 'org_admin' || profileData.role === 'super_admin')) {
+                    const { data: agents } = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('company_id', profileData.company_id)
+                        .neq('id', user.id);
+                    setCompanyAgents(agents || []);
+                }
+            }
+        }
+        fetchInitialData();
+    }, []);
+
+    async function handleTransfer(agentId: string) {
+        if (!selectedConversationId || !activeContact) return;
+        setIsUpdatingStatus(true);
+
+        const result = await transferConversation(selectedConversationId, activeContact.id, agentId);
+
+        if (result.success) {
+            setShowTransferModal(false);
+            // Si el admin quiere dejar de ver el chat tras transferirlo (si no es su chat)
+            // o si queremos simplemente refrescar. Veremos el efecto por RLS/Suscripción.
+            setSelectedConversationId(null);
+            setActiveContact(null);
+        } else {
+            alert('Error al transferir: ' + result.error);
+        }
+        setIsUpdatingStatus(false);
+    }
 
     async function updateConversationStatus(status: string, followUpAt?: string) {
         if (!selectedConversationId) return;
@@ -145,6 +203,8 @@ export default function ChatContainer() {
         }
     }
 
+    const isAdmin = profile?.role === 'org_admin' || profile?.role === 'super_admin';
+
     return (
         <div className="flex h-full overflow-hidden bg-[#0f1117]">
             {/* Sidebar: Conversation List */}
@@ -153,7 +213,15 @@ export default function ChatContainer() {
                 selectedConversationId ? "hidden md:flex" : "flex"
             )}>
                 <div className="p-4 border-b border-[#2a2e3d]">
-                    <h2 className="text-xl font-bold text-white tracking-tight">Chats</h2>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-bold text-white tracking-tight">Chats</h2>
+                        {isAdmin && (
+                            <div className="flex items-center gap-1 bg-[#2AABEE]/10 px-2 py-1 rounded-md">
+                                <Shield size={10} className="text-[#2AABEE]" />
+                                <span className="text-[8px] font-black uppercase tracking-widest text-[#2AABEE]">Oversight</span>
+                            </div>
+                        )}
+                    </div>
                     <div className="mt-1 text-[10px] text-[#2AABEE] font-bold uppercase tracking-widest">
                         Canal: Telegram
                     </div>
@@ -219,6 +287,48 @@ export default function ChatContainer() {
                                     >
                                         <Info size={18} />
                                     </button>
+
+                                    {/* Admin Transfer Button */}
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => setShowTransferModal(true)}
+                                            className="p-2 text-[#8b8fa3] hover:text-[#2AABEE] hover:bg-[#2AABEE]/10 rounded-lg transition-all"
+                                            title="Transferir a otro comercial"
+                                        >
+                                            <UserPlus size={18} />
+                                        </button>
+                                    )}
+
+                                    {/* Transfer Modal Overlay */}
+                                    {showTransferModal && (
+                                        <div className="absolute top-full right-0 mt-2 w-64 bg-[#1a1d27] border border-[#2a2e3d] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in zoom-in-95 duration-200">
+                                            <div className="p-4 border-b border-[#2a2e3d] bg-[#232732]/50">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[#2AABEE]">Transferir Conversation</h4>
+                                            </div>
+                                            <div className="max-h-60 overflow-y-auto py-2">
+                                                {companyAgents.length === 0 ? (
+                                                    <div className="px-4 py-3 text-xs text-[#4a4e5d] italic">No hay otros comerciales disponibles</div>
+                                                ) : (
+                                                    companyAgents.map(agent => (
+                                                        <button
+                                                            key={agent.id}
+                                                            onClick={() => handleTransfer(agent.id)}
+                                                            className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#232732] text-left transition-colors group"
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-[#1a1d27] flex items-center justify-center text-[10px] text-white font-bold border border-[#2a2e3d]">
+                                                                    {agent.full_name?.[0] || 'A'}
+                                                                </div>
+                                                                <span className="text-xs text-[#8b8fa3] group-hover:text-white">{agent.full_name}</span>
+                                                            </div>
+                                                            <ChevronRight size={14} className="text-[#4a4e5d]" />
+                                                        </button>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <button
                                         onClick={() => setShowDatePicker(!showDatePicker)}
                                         disabled={isUpdatingStatus}

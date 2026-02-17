@@ -76,11 +76,44 @@ export async function POST(request: NextRequest) {
             if (convError) console.error('Error fetching conversation:', convError);
 
             if (!conversation) {
-                console.log('Creating new conversation...');
+                console.log('Creating new conversation with Round Robin assignment...');
+
+                // 1. Get Default Company (Nexus Global)
+                const { data: company } = await supabase
+                    .from('companies')
+                    .select('id')
+                    .eq('slug', 'nexus-global')
+                    .single();
+
+                const companyId = company?.id;
+
+                // 2. Round Robin: Find agents and pick the one with fewest open conversations
+                // or just the next one in a sorted list.
+                const { data: agents } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('company_id', companyId)
+                    .eq('role', 'agent');
+
+                let assignedAgentId = null;
+                if (agents && agents.length > 0) {
+                    // Optimized Round Robin: pick agent with least open conversations
+                    const { data: assignments } = await supabase
+                        .rpc('get_agent_load', { org_id: companyId });
+
+                    if (assignments && assignments.length > 0) {
+                        assignedAgentId = assignments[0].agent_id;
+                    } else {
+                        assignedAgentId = agents[0].id; // Fallback
+                    }
+                }
+
                 const { data: newConversation, error: createConvError } = await supabase
                     .from('conversations')
                     .insert({
                         contact_id: currentContact.id,
+                        company_id: companyId,
+                        assigned_to: assignedAgentId,
                         channel: 'telegram',
                         status: 'open',
                     })
@@ -89,6 +122,15 @@ export async function POST(request: NextRequest) {
 
                 if (createConvError) console.error('Error creating conversation:', createConvError);
                 conversation = newConversation;
+
+                // Also update contact's company and assignment
+                await supabase
+                    .from('contacts')
+                    .update({
+                        company_id: companyId,
+                        assigned_to: assignedAgentId
+                    })
+                    .eq('id', currentContact.id);
             }
 
             // c. Create Message

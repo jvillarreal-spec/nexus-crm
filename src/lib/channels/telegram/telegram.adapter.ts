@@ -4,9 +4,14 @@ import { ChannelAdapter, UnifiedMessage, SendOptions, MediaPayload, MenuPayload 
 
 export class TelegramAdapter implements ChannelAdapter {
     readonly channelName = 'telegram';
+    private botToken: string;
+
+    constructor(token?: string) {
+        this.botToken = token || process.env.TELEGRAM_BOT_TOKEN || '';
+    }
 
     private getApiBase() {
-        return `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+        return `https://api.telegram.org/bot${this.botToken}`;
     }
 
     /**
