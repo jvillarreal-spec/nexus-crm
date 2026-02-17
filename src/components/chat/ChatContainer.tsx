@@ -154,17 +154,23 @@ export default function ChatContainer() {
                             </div>
 
                             {/* AI Summary Bar */}
-                            {showSummary && conversationSummary && (
-                                <div className="px-6 py-3 bg-[#1a1d27] border-b border-[#2AABEE]/20">
+                            {showSummary && (
+                                <div className="px-6 py-3 bg-[#1a1d27] border-b border-[#2AABEE]/20 animate-in fade-in duration-300">
                                     <div className="flex items-start gap-3">
                                         <div className="mt-0.5 p-1 bg-[#2AABEE]/10 rounded-md">
                                             <MessageSquare size={12} className="text-[#2AABEE]" />
                                         </div>
                                         <div>
                                             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2AABEE] mb-0.5">Contexto AI</div>
-                                            <p className="text-[11px] text-[#8b8fa3] leading-relaxed italic">
-                                                "{conversationSummary}"
-                                            </p>
+                                            {conversationSummary ? (
+                                                <p className="text-[11px] text-[#8b8fa3] leading-relaxed italic">
+                                                    "{conversationSummary}"
+                                                </p>
+                                            ) : (
+                                                <p className="text-[11px] text-[#4a4e5d] leading-relaxed italic animate-pulse">
+                                                    Generando contexto inteligente para esta conversación... (Envía o recibe un mensaje para activarlo)
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
