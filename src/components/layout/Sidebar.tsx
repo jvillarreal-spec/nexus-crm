@@ -148,6 +148,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <p className="text-[9px] text-[#2AABEE] font-black uppercase tracking-[0.1em] mt-0.5">
                                     {profile?.role === 'super_admin' ? 'Super Administrador' : profile?.role === 'org_admin' ? 'Administrador' : 'Asesor Comercial'}
                                 </p>
+                                <p className="text-[9px] text-[#4a4e5d] font-medium truncate mt-0.5">
+                                    {profile?.email}
+                                </p>
                             </div>
                         </div>
 

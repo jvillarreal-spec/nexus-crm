@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { updateCompanyBot } from '@/app/actions/admin';
 import { cn } from '@/lib/utils';
@@ -169,6 +169,31 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
 
+                                <div className="space-y-4 border-t border-[#2a2e3d] pt-6">
+                                    <h4 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                        <BookOpen size={14} className="text-[#2AABEE]" />
+                                        Guía de Configuración
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <StepItem
+                                            number="1"
+                                            text="Busca a @BotFather en Telegram y presiona /start."
+                                        />
+                                        <StepItem
+                                            number="2"
+                                            text="Envía el comando /newbot y sigue las instrucciones para darle un nombre y un username."
+                                        />
+                                        <StepItem
+                                            number="3"
+                                            text="Copia el API Token que te entregue BotFather (ej: 1234567:ABC...)."
+                                        />
+                                        <StepItem
+                                            number="4"
+                                            text="Pega el token arriba y haz clic en 'Guardar'. Nexus configurará el webhook automáticamente."
+                                        />
+                                    </div>
+                                </div>
+
                                 {message && (
                                     <div className={cn(
                                         "p-4 rounded-xl flex items-center gap-2 text-sm font-bold animate-in slide-in-from-top-2",
@@ -213,5 +238,18 @@ function TabItem({ icon, label, active, onClick, disabled }: any) {
             <span className={cn("transition-transform group-hover:scale-110", active && "scale-110")}>{icon}</span>
             <span className="tracking-wide">{label}</span>
         </button>
+    );
+}
+
+function StepItem({ number, text }: { number: string, text: string }) {
+    return (
+        <div className="flex gap-3 items-start group">
+            <div className="w-5 h-5 rounded-md bg-[#232732] border border-[#2a2e3d] flex items-center justify-center text-[10px] font-black text-[#2AABEE] shrink-0 group-hover:border-[#2AABEE]/30 transition-colors">
+                {number}
+            </div>
+            <p className="text-[11px] text-[#8b8fa3] leading-relaxed">
+                {text}
+            </p>
+        </div>
     );
 }
