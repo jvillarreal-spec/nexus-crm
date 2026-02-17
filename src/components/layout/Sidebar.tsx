@@ -125,8 +125,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-[#2a2e3d] bg-[#1a1d27]">
-                    <div className="flex items-center gap-3 px-2">
+                <div className="p-6 border-t border-[#2a2e3d] bg-[#1a1d27]">
+                    <div className="flex items-center gap-3 px-2 mb-6">
                         <div className="relative">
                             <div className="w-10 h-10 rounded-full bg-[#232732] flex items-center justify-center text-sm font-bold text-[#2AABEE] border border-[#2AABEE]/20 shadow-lg shadow-[#2AABEE]/5">
                                 {profile?.full_name?.[0] || profile?.email?.[0]?.toUpperCase() || 'U'}
@@ -143,14 +143,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 {profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'org_admin' ? 'Admin' : 'Comercial'}
                             </p>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="ml-auto p-2 text-[#4a4e5d] hover:text-[#ef4444] transition-all active:scale-90"
-                            title="Cerrar sesión"
-                        >
-                            <LogOut size={20} />
-                        </button>
                     </div>
+
+                    <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-[#8b8fa3] hover:text-white hover:bg-[#ef4444]/10 border border-transparent hover:border-[#ef4444]/20 transition-all group"
+                    >
+                        <LogOut size={18} className="group-hover:text-[#ef4444]" />
+                        <span>Cerrar sesión</span>
+                    </button>
                 </div>
             </aside>
 
