@@ -7,7 +7,7 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key",
 });
 
-// Version tag: 2026-02-16-v3-openai-ready
+// Version tag: 2026-02-16-v4-openai-active
 export interface AIAnalysisResult {
     intent: string;
     tags: string[];
