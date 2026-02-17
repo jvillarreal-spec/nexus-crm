@@ -138,35 +138,30 @@ export default function ChatContainer() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setShowSummary(prev => !prev);
-                                        }}
-                                        className={cn(
-                                            "relative z-20 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border",
-                                            showSummary
-                                                ? "bg-[#2AABEE]/15 text-[#2AABEE] border-[#2AABEE]/30 hover:bg-[#2AABEE]/25 whitespace-nowrap"
-                                                : "bg-[#1a1d27] text-[#8b8fa3] border-[#2a2e3d] hover:text-white whitespace-nowrap"
-                                        )}
-                                    >
-                                        {showSummary ? "Ocultar Resumen" : "Ver Resumen"}
-                                    </button>
-                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSummary(!showSummary)}
+                                    className={cn(
+                                        "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border cursor-pointer",
+                                        showSummary
+                                            ? "bg-[#2AABEE] text-white border-[#2AABEE]"
+                                            : "bg-transparent text-[#8b8fa3] border-[#2a2e3d] hover:text-white"
+                                    )}
+                                >
+                                    {showSummary ? "Ocultar" : "Resumen"}
+                                </button>
                             </div>
 
                             {/* AI Summary Bar */}
                             {showSummary && conversationSummary && (
-                                <div className="px-6 py-3 bg-[#2AABEE]/5 border-b border-[#2AABEE]/10 animate-in slide-in-from-top duration-300">
+                                <div className="px-6 py-3 bg-[#1a1d27] border-b border-[#2AABEE]/20">
                                     <div className="flex items-start gap-3">
-                                        <div className="mt-0.5 p-1 bg-[#2AABEE]/20 rounded-md">
+                                        <div className="mt-0.5 p-1 bg-[#2AABEE]/10 rounded-md">
                                             <MessageSquare size={12} className="text-[#2AABEE]" />
                                         </div>
                                         <div>
-                                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2AABEE]/80 mb-1">AI Context Summary</div>
+                                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2AABEE] mb-0.5">Contexto AI</div>
                                             <p className="text-[11px] text-[#8b8fa3] leading-relaxed italic">
                                                 "{conversationSummary}"
                                             </p>
@@ -176,17 +171,19 @@ export default function ChatContainer() {
                             )}
 
                             {/* Messages Area */}
-                            <div className="flex-1 overflow-hidden relative bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+                            <div className="flex-1 overflow-hidden relative bg-[#0f1117]">
                                 <MessageList conversationId={selectedConversationId} />
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-4 bg-[#1a1d27]/50 backdrop-blur-md border-t border-[#2a2e3d]">
-                                <ChatInput
-                                    conversationId={selectedConversationId}
-                                    contactId={activeContact.id}
-                                    contactName={activeContact.first_name}
-                                />
+                            <div className="p-4 bg-[#1a1d27] border-t border-[#2a2e3d]">
+                                {activeContact && (
+                                    <ChatInput
+                                        conversationId={selectedConversationId}
+                                        contactId={activeContact.id}
+                                        contactName={activeContact.first_name}
+                                    />
+                                )}
                             </div>
                         </div>
 
