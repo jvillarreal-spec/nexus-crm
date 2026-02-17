@@ -37,6 +37,8 @@ export default function Dashboard() {
     const [agentLoads, setAgentLoads] = useState<any[]>([]);
     const [pipelineStats, setPipelineStats] = useState<any[]>([]);
     const [profile, setProfile] = useState<any>(null);
+    const [authId, setAuthId] = useState<string | null>(null);
+    const [debugError, setDebugError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Date Range State (Default: Last 30 Days)
@@ -56,7 +58,9 @@ export default function Dashboard() {
         setLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            console.log('--- DASHBOARD AUTH DEBUG ---', user?.id);
             if (user) {
+                setAuthId(user.id);
                 const { data: profileData } = await supabase
                     .from('profiles')
                     .select('*, companies(*)')
@@ -269,10 +273,10 @@ export default function Dashboard() {
             <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
                 <h3 className="text-xs font-black text-red-500 uppercase tracking-widest mb-2">Inspección de Sesión</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-[10px] font-mono text-[#8b8fa3]">
-                    <div>UserID: <span className="text-white">{profile?.id || 'No hay ID'}</span></div>
+                    <div>AuthID (Raw): <span className="text-white">{authId || 'Buscando...'}</span></div>
                     <div>Rol: <span className="text-white">{profile?.role || 'Sin rol'}</span></div>
-                    <div>EmpresaID: <span className="text-white">{profile?.company_id || 'SIN EMPRESA'}</span></div>
-                    <div>Empresa: <span className="text-white">{profile?.companies?.name || 'N/A'}</span></div>
+                    <div>EmpresaID: <span className="text-white">{profile?.company_id || 'SIN PERFIL'}</span></div>
+                    <div>Error: <span className="text-red-400 font-bold">{debugError || 'Ninguno'}</span></div>
                 </div>
             </div>
 
