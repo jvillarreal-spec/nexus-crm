@@ -52,22 +52,47 @@ export default function ChatContainer() {
     useEffect(() => {
         if (!selectedConversationId) return;
 
-        const subscription = supabase
+        const channel = supabase
             .channel(`active_conv_${selectedConversationId}`)
             .on('postgres_changes', {
-                event: 'UPDATE',
+                event: '*',
                 schema: 'public',
                 table: 'conversations',
                 filter: `id=eq.${selectedConversationId}`
             }, (payload: any) => {
-                if (payload.new.summary) {
+                console.log('Conversation update detected:', payload);
+                if (payload.new && payload.new.summary !== undefined) {
                     setConversationSummary(payload.new.summary);
                 }
             })
             .subscribe();
 
+        // Also listen for NEW MESSAGES to force a summary refresh after a short delay
+        const msgChannel = supabase
+            .channel(`message_trigger_${selectedConversationId}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `conversation_id=eq.${selectedConversationId}`
+            }, () => {
+                // Wait 3 seconds for AI to process, then force refresh summary
+                setTimeout(() => {
+                    supabase
+                        .from('conversations')
+                        .select('summary')
+                        .eq('id', selectedConversationId)
+                        .single()
+                        .then(({ data }) => {
+                            if (data?.summary) setConversationSummary(data.summary);
+                        });
+                }, 3500);
+            })
+            .subscribe();
+
         return () => {
-            subscription.unsubscribe();
+            supabase.removeChannel(channel);
+            supabase.removeChannel(msgChannel);
         };
     }, [selectedConversationId]);
 

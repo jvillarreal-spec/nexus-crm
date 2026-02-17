@@ -5,7 +5,7 @@ import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
 
 export async function POST(request: Request) {
     try {
-        const { contactId, text, messageId } = await request.json();
+        const { contactId, conversationId, text, messageId } = await request.json();
 
         if (!contactId || !text) {
             return NextResponse.json({ error: 'Missing contactId or text' }, { status: 400 });
@@ -38,28 +38,26 @@ export async function POST(request: Request) {
                     const { AIService } = await import('@/lib/ai/ai.service');
                     const ai = new AIService();
 
-                    // Fetch conversation_id for this message/contact
-                    const { data: msgData } = await supabase
-                        .from('messages')
-                        .select('conversation_id')
-                        .eq('id', messageId)
-                        .maybeSingle();
+                    const activeConvId = conversationId;
 
-                    if (msgData?.conversation_id) {
+                    if (activeConvId) {
                         const { data: recentMessages } = await supabase
                             .from('messages')
                             .select('direction, body')
-                            .eq('conversation_id', msgData.conversation_id)
+                            .eq('conversation_id', activeConvId)
                             .order('created_at', { ascending: false })
                             .limit(10);
 
                         if (recentMessages && recentMessages.length >= 2) {
+                            console.log('AI: Updating summary after outbound message...');
                             const summary = await ai.generateConversationSummary(recentMessages.reverse());
                             await supabase
                                 .from('conversations')
                                 .update({ summary })
-                                .eq('id', msgData.conversation_id);
+                                .eq('id', activeConvId);
                         }
+                    } else {
+                        console.warn('AI: No conversationId provided for summary update');
                     }
                 } catch (summaryErr) {
                     console.error('Error updating summary after send:', summaryErr);
