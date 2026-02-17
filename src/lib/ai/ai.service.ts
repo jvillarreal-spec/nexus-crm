@@ -1,9 +1,13 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "");
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || "dummy-key",
+});
 
-// Version tag: 2026-02-16-v2
+// Version tag: 2026-02-16-v3-openai-ready
 export interface AIAnalysisResult {
     intent: string;
     tags: string[];
@@ -21,7 +25,8 @@ export interface AIAnalysisResult {
 
 export class AIService {
     /**
-     * Consolidates Analysis and Sales Advice into a single API call to save quota (15 RPM free tier).
+     * Consolidates Analysis and Sales Advice into a single API call.
+     * Prefers OpenAI (GPT-4o mini) if OPENAI_API_KEY is set.
      */
     async processFullEnrichment(message: string, currentData: any = {}, businessContext: string = ""): Promise<any> {
         const prompt = `
@@ -37,8 +42,8 @@ export class AIService {
         "${message}"
 
         TU TAREA:
-        1. Extrae: intent, tags, first_name, last_name, email, phone, company, budget, summary.
-        2. Genera Coaching: insights, next_step, objection_handling, suggested_replies (2 opciones).
+        1. Extrae: intent (ventas, soporte, info, saludo), tags (array), first_name, last_name, email, phone, company, budget, summary.
+        2. Genera Coaching: insights (qué quiere realmente), next_step (acción sugerida), objection_handling (si aplica), suggested_replies (2 opciones cortas estilo WhatsApp).
 
         RESPONDE ÚNICAMENTE CON ESTE FORMATO JSON:
         {
@@ -60,12 +65,51 @@ export class AIService {
         }
         `;
 
-        return this.generateWithRetry(prompt, "gemini-2.0-flash");
+        // PROVIDER CHOICE:
+        if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "your-openai-key") {
+            return this.generateWithOpenAI(prompt);
+        } else {
+            return this.generateWithGemini(prompt, "gemini-2.0-flash");
+        }
     }
 
-    private async generateWithRetry(prompt: string, modelName: string, attempt: number = 0): Promise<any> {
+    /**
+     * OpenAI Provider Logic
+     */
+    private async generateWithOpenAI(prompt: string, attempt: number = 0): Promise<any> {
+        const maxRetries = 2;
+        try {
+            console.log(`AI: Requesting from OpenAI (Attempt ${attempt + 1})...`);
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    { role: "system", content: "Eres un asistente de NexusCRM que solo responde en JSON válido." },
+                    { role: "user", content: prompt }
+                ],
+                response_format: { type: "json_object" }
+            });
+
+            const content = completion.choices[0].message.content;
+            if (!content) throw new Error("OpenAI returned empty content");
+            return JSON.parse(content);
+        } catch (error: any) {
+            console.error("OpenAI Error:", error.message);
+            if (attempt < maxRetries && (error.status === 429 || error.status >= 500)) {
+                const delay = 2000 * (attempt + 1);
+                await new Promise(r => setTimeout(r, delay));
+                return this.generateWithOpenAI(prompt, attempt + 1);
+            }
+            throw new Error(`[OPENAI_ERROR] ${error.message}`);
+        }
+    }
+
+    /**
+     * Gemini Provider Logic (Legacy/Fallback)
+     */
+    private async generateWithGemini(prompt: string, modelName: string, attempt: number = 0): Promise<any> {
         const maxRetries = 3;
         try {
+            console.log(`AI: Requesting from Gemini ${modelName} (Attempt ${attempt + 1})...`);
             const model = genAI.getGenerativeModel({ model: modelName }, { apiVersion: "v1" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
@@ -78,22 +122,20 @@ export class AIService {
 
             if ((isQuota || isServer) && attempt < maxRetries) {
                 const delay = isQuota ? 5000 * (attempt + 1) : 2000 * (attempt + 1);
-                console.warn(`AI: ${isQuota ? 'Quota' : 'Server'} error. Retrying in ${delay}ms... (Attempt ${attempt + 1})`);
+                console.warn(`AI: Gemini error. Retrying in ${delay}ms...`);
                 await new Promise(r => setTimeout(r, delay));
-                return this.generateWithRetry(prompt, modelName, attempt + 1);
+                return this.generateWithGemini(prompt, modelName, attempt + 1);
             }
 
-            if (isQuota) throw new Error("[QUOTA_ERROR] Revisa los límites de tu llave en AI Studio.");
+            if (isQuota) throw new Error("[QUOTA_ERROR] Se agotó la cuota de Gemini. Por favor configura OpenAI para mayor estabilidad.");
             throw error;
         }
     }
 
     /**
-     * Legacy methods kept for compatibility but now use the retry helper
+     * Compatibility helpers
      */
     async analyzeMessage(message: string, currentData: any = {}): Promise<AIAnalysisResult> {
-        // Implementation moved to generateWithRetry pattern if needed, 
-        // but recommendation is to use processFullEnrichment.
         const result = await this.processFullEnrichment(message, currentData);
         return result.analysis;
     }
