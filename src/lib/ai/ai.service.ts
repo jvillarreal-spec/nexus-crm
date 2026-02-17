@@ -7,7 +7,7 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY || "dummy-key",
 });
 
-// Version tag: 2026-02-16-v4-openai-active
+// Version tag: 2026-02-16-v5-OPENAI-FORCE
 export interface AIAnalysisResult {
     intent: string;
     tags: string[];
@@ -26,7 +26,7 @@ export interface AIAnalysisResult {
 export class AIService {
     /**
      * Consolidates Analysis and Sales Advice into a single API call.
-     * Prefers OpenAI (GPT-4o mini) if OPENAI_API_KEY is set.
+     * Prefers OpenAI (GPT-4o mini) if OPENAI_API_KEY is detected.
      */
     async processFullEnrichment(message: string, currentData: any = {}, businessContext: string = ""): Promise<any> {
         const prompt = `
@@ -65,10 +65,15 @@ export class AIService {
         }
         `;
 
-        // PROVIDER CHOICE:
-        if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "your-openai-key") {
+        // PROVIDER CHOICE (Robust detection)
+        const openAIKey = process.env.OPENAI_API_KEY;
+        const isUsingOpenAI = openAIKey && openAIKey.startsWith('sk-');
+
+        if (isUsingOpenAI) {
+            console.log("AI: Using OPENAI Provider (Primary)");
             return this.generateWithOpenAI(prompt);
         } else {
+            console.log("AI: Using GEMINI Provider (Fallback)");
             return this.generateWithGemini(prompt, "gemini-2.0-flash");
         }
     }
