@@ -32,8 +32,40 @@ export async function POST(request: Request) {
         try {
             await telegram.sendTextMessage(contact.channel_id, text);
 
-            // TelegramAdapter.sendTextMessage doesn't return value in this version,
-            // it throws if error.
+            // After sending, update conversation summary in background
+            (async () => {
+                try {
+                    const { AIService } = await import('@/lib/ai/ai.service');
+                    const ai = new AIService();
+
+                    // Fetch conversation_id for this message/contact
+                    const { data: msgData } = await supabase
+                        .from('messages')
+                        .select('conversation_id')
+                        .eq('id', messageId)
+                        .maybeSingle();
+
+                    if (msgData?.conversation_id) {
+                        const { data: recentMessages } = await supabase
+                            .from('messages')
+                            .select('direction, body')
+                            .eq('conversation_id', msgData.conversation_id)
+                            .order('created_at', { ascending: false })
+                            .limit(10);
+
+                        if (recentMessages && recentMessages.length >= 2) {
+                            const summary = await ai.generateConversationSummary(recentMessages.reverse());
+                            await supabase
+                                .from('conversations')
+                                .update({ summary })
+                                .eq('id', msgData.conversation_id);
+                        }
+                    }
+                } catch (summaryErr) {
+                    console.error('Error updating summary after send:', summaryErr);
+                }
+            })();
+
             return NextResponse.json({ success: true });
         } catch (telegramError: any) {
             console.error('Telegram API error:', telegramError);

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
@@ -12,6 +13,9 @@ import { SalesCoach } from './SalesCoach';
 export default function ChatContainer() {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
     const [activeContact, setActiveContact] = useState<any | null>(null);
+    const [conversationSummary, setConversationSummary] = useState<string | null>(null);
+    const [showSummary, setShowSummary] = useState(true);
+
     const supabase = createClient();
     const searchParams = useSearchParams();
     const contactIdFromUrl = searchParams.get('contactId');
@@ -44,16 +48,40 @@ export default function ChatContainer() {
         };
     }, [activeContact?.id]);
 
+    // Real-time summary sync for the active conversation
+    useEffect(() => {
+        if (!selectedConversationId) return;
+
+        const subscription = supabase
+            .channel(`active_conv_${selectedConversationId}`)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'conversations',
+                filter: `id=eq.${selectedConversationId}`
+            }, (payload: any) => {
+                if (payload.new.summary) {
+                    setConversationSummary(payload.new.summary);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, [selectedConversationId]);
+
     async function fetchConversationForContact(contactId: string) {
         const { data: conversation, error } = await supabase
             .from('conversations')
-            .select('id, contacts(*)')
+            .select('id, summary, contacts(*)')
             .eq('contact_id', contactId)
             .eq('status', 'open')
             .maybeSingle();
 
         if (conversation) {
             setSelectedConversationId(conversation.id);
+            setConversationSummary(conversation.summary);
             setActiveContact(conversation.contacts as any);
         }
     }
@@ -73,6 +101,13 @@ export default function ChatContainer() {
                         onSelect={(id: string, contact: any) => {
                             setSelectedConversationId(id);
                             setActiveContact(contact);
+                            // Also fetch summary if not already in contact metadata
+                            supabase
+                                .from('conversations')
+                                .select('summary')
+                                .eq('id', id)
+                                .single()
+                                .then(({ data }) => setConversationSummary(data?.summary));
                         }}
                         selectedId={selectedConversationId}
                     />
@@ -103,7 +138,33 @@ export default function ChatContainer() {
                                         </div>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={() => setShowSummary(!showSummary)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                                        showSummary ? "bg-[#2AABEE]/20 text-[#2AABEE] border border-[#2AABEE]/30" : "bg-[#1a1d27] text-[#8b8fa3] border border-[#2a2e3d]"
+                                    )}
+                                >
+                                    {showSummary ? "Ocultar Resumen" : "Ver Resumen"}
+                                </button>
                             </div>
+
+                            {/* AI Summary Bar */}
+                            {showSummary && conversationSummary && (
+                                <div className="px-6 py-3 bg-[#2AABEE]/5 border-b border-[#2AABEE]/10 animate-in slide-in-from-top duration-300">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 p-1 bg-[#2AABEE]/20 rounded-md">
+                                            <MessageSquare size={12} className="text-[#2AABEE]" />
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2AABEE]/80 mb-1">AI Context Summary</div>
+                                            <p className="text-[11px] text-[#8b8fa3] leading-relaxed italic">
+                                                "{conversationSummary}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Messages Area */}
                             <div className="flex-1 overflow-hidden relative bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">

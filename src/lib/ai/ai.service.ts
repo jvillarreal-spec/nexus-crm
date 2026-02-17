@@ -149,4 +149,50 @@ export class AIService {
         const result = await this.processFullEnrichment(message, currentData, businessContext);
         return result.advice;
     }
+
+    /**
+     * Generates a concise summary of the conversation history.
+     */
+    async generateConversationSummary(messages: any[]): Promise<string> {
+        const messagesText = messages
+            .map(m => `${m.direction === 'inbound' ? 'Cliente' : 'Agente'}: ${m.body}`)
+            .join('\n');
+
+        const prompt = `
+        Resume esta conversación de CRM en un solo párrafo corto y profesional (máximo 3 líneas).
+        Céntrate en:
+        - ¿Qué busca o necesita el cliente?
+        - ¿En qué punto de la negociación/soporte estamos?
+        - ¿Qué es lo último que se acordó o quedó pendiente?
+
+        CONVERSACIÓN:
+        ${messagesText}
+
+        RESPUESTA:
+        Solo el resumen en texto plano, sin prefijos como "Resumen:" ni comillas.
+        `;
+
+        const openAIKey = process.env.OPENAI_API_KEY;
+        const isUsingOpenAI = openAIKey && openAIKey.startsWith('sk-');
+
+        try {
+            if (isUsingOpenAI) {
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        { role: "system", content: "Eres un experto en resúmenes ejecutivos para CRM. Tu objetivo es dar contexto rápido al agente." },
+                        { role: "user", content: prompt }
+                    ],
+                });
+                return completion.choices[0].message.content || "No se pudo generar el resumen.";
+            } else {
+                const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }, { apiVersion: "v1" });
+                const result = await model.generateContent(prompt);
+                return result.response.text().trim();
+            }
+        } catch (error) {
+            console.error("Error generating summary:", error);
+            return "Error al generar el resumen automático.";
+        }
+    }
 }

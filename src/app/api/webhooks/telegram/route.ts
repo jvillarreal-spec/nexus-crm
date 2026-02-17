@@ -124,6 +124,20 @@ export async function POST(request: NextRequest) {
                     try {
                         const ai = new AIService();
 
+                        // Update Conversation Summary periodically
+                        const { data: recentMessages } = await supabase
+                            .from('messages')
+                            .select('direction, body')
+                            .eq('conversation_id', conversation.id)
+                            .order('created_at', { ascending: false })
+                            .limit(10);
+
+                        if (recentMessages && recentMessages.length >= 2) {
+                            console.log('AI: Updating conversation summary...');
+                            const summary = await ai.generateConversationSummary(recentMessages.reverse());
+                            await supabase.from('conversations').update({ summary }).eq('id', conversation.id);
+                        }
+
                         // Always fetch latest to avoid race conditions with quick messages
                         const { data: latestContact } = await supabase
                             .from('contacts')
