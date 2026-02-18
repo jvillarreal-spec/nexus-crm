@@ -238,17 +238,54 @@ export async function POST(request: NextRequest) {
                         } else if (intent === 'handover_request') {
                             // --- HANDOVER FLOW ---
 
-                            // 1. Check Business Hours & Agent Load
-                            // Function is_business_open and get_agent_load must be accessible via RPC or query
-                            // Since we can't easily call PLPGSQL function directly from JS client without RPC,
-                            // we can query the company settings directly or use RPC if exposed.
-                            // For simplicity/robustness, let's fetch settings and do logic here OR use the simple RPC created.
+                            // 1. Check Business Hours in JS (more reliable than DB function)
+                            let isBusinessOpen = true; // Default: open
+                            try {
+                                const { data: companyData } = await supabase
+                                    .from('companies')
+                                    .select('business_hours, timezone')
+                                    .eq('id', companyId)
+                                    .single();
 
-                            const { data: isOpen } = await supabase.rpc('is_business_open', { company_id: companyId });
+                                if (companyData?.business_hours) {
+                                    const tz = companyData.timezone || 'America/Bogota';
+                                    const now = new Date();
+                                    // Get current time in company timezone
+                                    const localTime = new Intl.DateTimeFormat('en-US', {
+                                        timeZone: tz,
+                                        weekday: 'long',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: false,
+                                    }).formatToParts(now);
+
+                                    const dayName = localTime.find(p => p.type === 'weekday')?.value?.toLowerCase() || '';
+                                    const hour = localTime.find(p => p.type === 'hour')?.value || '0';
+                                    const minute = localTime.find(p => p.type === 'minute')?.value || '0';
+                                    const currentMinutes = parseInt(hour) * 60 + parseInt(minute);
+
+                                    const dayConfig = companyData.business_hours[dayName];
+                                    console.log(`[BusinessHours] Day: ${dayName}, Time: ${hour}:${minute}, Config:`, dayConfig);
+
+                                    if (!dayConfig || dayConfig.enabled === false) {
+                                        isBusinessOpen = false;
+                                    } else {
+                                        const [startH, startM] = (dayConfig.start || '09:00').split(':').map(Number);
+                                        const [endH, endM] = (dayConfig.end || '18:00').split(':').map(Number);
+                                        const startMinutes = startH * 60 + startM;
+                                        const endMinutes = endH * 60 + endM;
+                                        isBusinessOpen = currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+                                    }
+                                    console.log(`[BusinessHours] Is open: ${isBusinessOpen}`);
+                                }
+                            } catch (bhError) {
+                                console.error('[BusinessHours] Error checking hours, defaulting to open:', bhError);
+                                isBusinessOpen = true; // Fail open
+                            }
 
                             let assignedAgentId = null;
 
-                            if (isOpen === false) {
+                            if (!isBusinessOpen) {
                                 // CLOSED - Immediate Fallback
                                 await sendAdapter.sendTextMessage(unifiedMessage.chatId, "🌙 <b>Actualmente estamos fuera de horario laboral.</b>\n\nPor favor, déjanos tu <b>Nombre, Teléfono y Correo</b>. Te contactaremos tan pronto abramos. 🕒");
                                 return NextResponse.json({ ok: true });
@@ -259,6 +296,7 @@ export async function POST(request: NextRequest) {
 
                             // The variable is already declared above
                             assignedAgentId = null;
+
 
 
                             if (assignments && assignments.length > 0) {
