@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
+
 
 const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,6 +161,43 @@ export async function updateSupportEmail(companyId: string, email: string) {
         return { success: true };
     } catch (error: any) {
         console.error('Error updating support email:', error);
+        return { success: false, error: error.message };
+    }
+}
+export async function closeConversation(conversationId: string) {
+    try {
+        // 1. Get conversation and contact details to send the message
+        const { data: conversation, error: fetchError } = await supabaseAdmin
+            .from('conversations')
+            .select('contact_id, contacts(channel_id, companies(telegram_token))')
+            .eq('id', conversationId)
+            .single();
+
+        if (fetchError || !conversation) {
+            throw new Error('Conversation not found');
+        }
+
+        // 2. Update status to closed
+        const { error: updateError } = await supabaseAdmin
+            .from('conversations')
+            .update({ status: 'closed', updated_at: new Date().toISOString() })
+            .eq('id', conversationId);
+
+        if (updateError) throw updateError;
+
+        // 3. Send Closing Message via Telegram
+        const contact = conversation.contacts as any;
+        const companyToken = contact?.companies?.telegram_token;
+        const chatId = contact?.channel_id;
+
+        if (companyToken && chatId) {
+            const telegram = new TelegramAdapter(companyToken);
+            await telegram.sendTextMessage(chatId, "Has finalizado tu conversación con el asesor, vuelve pronto, estamos para ayudarte 👋");
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error closing conversation:', error);
         return { success: false, error: error.message };
     }
 }

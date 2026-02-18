@@ -30,8 +30,8 @@ export class AIService {
      */
     async processFullEnrichment(message: string, currentData: any = {}, businessContext: string = ""): Promise<any> {
         const prompt = `
-        Eres un experto en CRM y Sales Coaching de NexusCRM.
-        Analiza el siguiente mensaje y genera UN SOLO JSON con la extracción de datos y consejos de venta.
+        Eres el cerebro de un Bot de Telegram para NexusCRM.
+        Analiza el siguiente mensaje y genera UN SOLO JSON con la extracción de datos, consejos de venta y ROUTING INTENT.
 
         CONTEXTO EMPRESA:
         ${businessContext || "Genérico."}
@@ -42,19 +42,24 @@ export class AIService {
         "${message}"
 
         TU TAREA:
-        1. Extrae: intent (ventas, soporte, info, saludo), tags (array), first_name, last_name, email, phone, company, budget, summary.
-        2. Determina Estado Sugerido: "open" (sigamos hablando), "pending" (agendar seguimiento si pidió hablar después), o "closed" (si ya compró o dijo que no).
-        3. Genera Coaching: insights (qué quiere realmente), next_step (acción sugerida), objection_handling (si aplica), suggested_replies (2 opciones cortas estilo WhatsApp).
- 
+        1. CLASIFICA EL INTENT (CRÍTICO PARA EL ROUTING):
+           - "bot_query": Preguntas sobre precios, productos, horarios, info general. (El bot debe responder).
+           - "support_request": El cliente reporta un error, queja o pide ayuda técnica. (Enviar a soporte).
+           - "handover_request": El cliente pide explícitamente hablar con un humano/asesor. (Pasar a agente).
+           - "general": Saludos o mensajes sin intención clara. (El bot saluda o pregunta en qué ayudar).
+
+        2. EXTRAE DATOS: tags (array), first_name, last_name, email, phone, company, budget, summary.
+        3. ESTADO SUGERIDO: "open", "pending", "closed".
+
         RESPONDE ÚNICAMENTE CON ESTE FORMATO JSON:
         {
           "analysis": {
-             "intent": "string",
+             "intent": "bot_query|support_request|handover_request|general",
              "tags": ["string"],
              "sentiment": "positive|neutral|negative",
              "suggested_status": "open|pending|closed",
              "extracted_data": {
-                "first_name": "string|null", "last_name": "string|null", "email": "string|null", 
+                "first_name": "string|null", "last_name": "string|null", "email": "string|null",
                 "phone": "string|null", "company": "string|null", "budget": "string|null", "summary": "string"
              }
           },

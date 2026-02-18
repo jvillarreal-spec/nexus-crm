@@ -21,7 +21,8 @@ import ConversationList from './ConversationList';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import { SalesCoach } from './SalesCoach';
-import { transferConversation } from '@/app/actions/admin';
+import { transferConversation, closeConversation } from '@/app/actions/admin';
+
 
 export default function ChatContainer() {
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -87,6 +88,20 @@ export default function ChatContainer() {
         if (!selectedConversationId) return;
         setIsUpdatingStatus(true);
 
+        // Special handling for CLOSING a conversation to trigger the Telegram farewell message
+        if (status === 'closed') {
+            const result = await closeConversation(selectedConversationId);
+            if (result.success) {
+                setSelectedConversationId(null);
+                setActiveContact(null);
+            } else {
+                console.error('Error closing conversation:', result.error);
+                alert('Error al finalizar el chat');
+            }
+            setIsUpdatingStatus(false);
+            return;
+        }
+
         const updateData: any = {
             status,
             updated_at: new Date().toISOString()
@@ -111,6 +126,7 @@ export default function ChatContainer() {
         }
         setIsUpdatingStatus(false);
     }
+
 
     // Handle deep linking and metadata refresh
     useEffect(() => {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AIService } from '@/lib/ai/ai.service';
+import { EmailService } from '@/lib/email/email.service';
 
 export async function POST(request: NextRequest) {
     console.log('--- Telegram Webhook received ---');
@@ -15,9 +16,13 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Parse Incoming Update
+        // 2. Parse Incoming Update
         const rawUpdate = await request.json();
+
+        // Initial adapter just for parsing, doesn't need token yet
         const adapter = new TelegramAdapter();
         const unifiedMessage = adapter.parseIncoming(rawUpdate);
+
 
         if (!unifiedMessage) {
             console.log('Ignored update (not a supported message type)');
@@ -27,8 +32,9 @@ export async function POST(request: NextRequest) {
         console.log(`Processing message from ${unifiedMessage.senderName} (${unifiedMessage.chatId})`);
 
         // 3. Store in DB (Supabase Admin)
-        console.log('Storing in database...');
         const supabase = createAdminClient();
+        const ai = new AIService();
+        const emailService = new EmailService();
 
         // a. Ensure Contact Exists
         const { data: contact, error: contactError } = await supabase
@@ -37,10 +43,6 @@ export async function POST(request: NextRequest) {
             .eq('channel', 'telegram')
             .eq('channel_id', unifiedMessage.chatId)
             .maybeSingle();
-
-        if (contactError) {
-            console.error('Error fetching contact:', contactError);
-        }
 
         let currentContact = contact;
 
@@ -57,86 +59,61 @@ export async function POST(request: NextRequest) {
                 .select('id, tags, metadata, first_name, last_name, email, phone')
                 .single();
 
-            if (insertError) {
-                console.error('Error creating contact:', insertError);
-            }
+            if (insertError) console.error('Error creating contact:', insertError);
             currentContact = newContact;
         }
 
         if (currentContact) {
-            console.log(`Contact ID: ${currentContact.id}. Finding/Creating conversation...`);
             // b. Ensure Conversation Exists
             let { data: conversation, error: convError } = await supabase
                 .from('conversations')
-                .select('id, unread_count')
+                .select('id, unread_count, assigned_to, company_id, created_at')
+
                 .eq('contact_id', currentContact.id)
                 .eq('status', 'open')
                 .maybeSingle();
 
-            if (convError) console.error('Error fetching conversation:', convError);
-
-            if (!conversation) {
-                console.log('Creating new conversation with Round Robin assignment...');
-
-                // 1. Get Default Company (Nexus Global)
+            // NEW: Default Company (Nexus Global)
+            let companyId = conversation?.company_id;
+            if (!companyId) {
                 const { data: company } = await supabase
                     .from('companies')
                     .select('id')
                     .eq('slug', 'nexus-global')
                     .single();
+                companyId = company?.id;
+            }
 
-                const companyId = company?.id;
-
-                // 2. Round Robin: Find agents and pick the one with fewest open conversations
-                // or just the next one in a sorted list.
-                const { data: agents } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('company_id', companyId)
-                    .eq('role', 'agent');
-
-                let assignedAgentId = null;
-                if (agents && agents.length > 0) {
-                    // Optimized Round Robin: pick agent with least open conversations
-                    const { data: assignments } = await supabase
-                        .rpc('get_agent_load', { org_id: companyId });
-
-                    if (assignments && assignments.length > 0) {
-                        assignedAgentId = assignments[0].agent_id;
-                    } else {
-                        assignedAgentId = agents[0].id; // Fallback
-                    }
-                }
+            if (!conversation) {
+                console.log('Creating new conversation (Bot Mode - Unassigned)...');
 
                 const { data: newConversation, error: createConvError } = await supabase
                     .from('conversations')
                     .insert({
                         contact_id: currentContact.id,
                         company_id: companyId,
-                        assigned_to: assignedAgentId,
+                        assigned_to: null, // Start Unassigned (Bot Mode)
                         channel: 'telegram',
                         status: 'open',
                     })
-                    .select('id, unread_count')
+                    .select('id, unread_count, assigned_to, company_id, created_at')
+
                     .single();
 
                 if (createConvError) console.error('Error creating conversation:', createConvError);
                 conversation = newConversation;
 
-                // Also update contact's company and assignment
-                await supabase
-                    .from('contacts')
-                    .update({
-                        company_id: companyId,
-                        assigned_to: assignedAgentId
-                    })
-                    .eq('id', currentContact.id);
+                // Set contact company
+                await supabase.from('contacts').update({ company_id: companyId }).eq('id', currentContact.id);
             }
 
-            // c. Create Message
+            const isNewConversation = !conversation || (conversation.created_at && new Date().getTime() - new Date(conversation.created_at).getTime() < 5000 && conversation.unread_count <= 1);
+
+
+            // c. Save Message
             if (conversation) {
-                console.log(`Conversation ID: ${conversation.id}. Saving message...`);
-                const { error: msgError } = await supabase.from('messages').insert({
+                // Save inbound message
+                await supabase.from('messages').insert({
                     conversation_id: conversation.id,
                     channel_message_id: unifiedMessage.channelMessageId,
                     direction: 'inbound',
@@ -146,108 +123,178 @@ export async function POST(request: NextRequest) {
                     media_url: unifiedMessage.mediaUrl,
                 });
 
-                if (msgError) {
-                    console.error('Error saving message:', msgError);
+                // Update timestamps
+                await supabase.from('conversations').update({
+                    last_message_at: new Date().toISOString(),
+                    unread_count: (conversation.unread_count || 0) + 1
+                }).eq('id', conversation.id);
+
+                // --- LOGIC SPLIT: BOT vs AGENT ---
+
+                if (conversation.assigned_to) {
+                    // --- AGENT MODE ---
+                    console.log('Conversation assigned to agent. Skipping Bot Auto-Response.');
+                    // Optional: Run silent AI enrichment to keep tags updated
                 } else {
-                    console.log('Message saved successfully');
+                    // --- BOT MODE ---
+                    // --- BOT MODE ---
+                    console.log(`[BOT] Conversation ${conversation.id} is UNASSIGNED. Bot taking control.`);
 
-                    // d. Update Conversation & Contact Metadata Immediately
-                    await Promise.all([
-                        supabase.from('conversations').update({
-                            last_message_at: new Date().toISOString(),
-                            unread_count: (conversation.unread_count || 0) + 1
-                        }).eq('id', conversation.id),
-                        supabase.from('contacts').update({
-                            updated_at: new Date().toISOString()
-                        }).eq('id', currentContact.id)
-                    ]);
+                    // FETCH TOKEN FOR SENDING
+                    // Check DB for token
+                    const { data: companyData } = await supabase
+                        .from('companies')
+                        .select('telegram_token')
+                        .eq('id', companyId)
+                        .single();
 
-                    // e. AI Enrichment (Optimized for Serverless)
-                    try {
-                        const ai = new AIService();
+                    const dbToken = companyData?.telegram_token;
+                    // Fallback to Env var if DB token is missing
+                    const finalToken = dbToken || process.env.TELEGRAM_BOT_TOKEN;
 
-                        // Update Conversation Summary periodically
-                        const { data: recentMessages } = await supabase
-                            .from('messages')
-                            .select('direction, body')
-                            .eq('conversation_id', conversation.id)
-                            .order('created_at', { ascending: false })
-                            .limit(10);
+                    console.log(`[BOT] Sending with token: ${finalToken ? 'FOUND (Ends with ' + finalToken.slice(-4) + ')' : 'MISSING'}`);
 
-                        if (recentMessages && recentMessages.length >= 2) {
-                            console.log('AI: Updating conversation summary...');
-                            const summary = await ai.generateConversationSummary(recentMessages.reverse());
-                            await supabase.from('conversations').update({ summary }).eq('id', conversation.id);
-                        }
-
-                        // Always fetch latest to avoid race conditions with quick messages
-                        const { data: latestContact } = await supabase
-                            .from('contacts')
-                            .select('*')
-                            .eq('id', currentContact.id)
-                            .single();
-
-                        const contactToAnalyze = latestContact || currentContact;
-
-                        // Fetch Knowledge Base
-                        const { data: knowledge } = await supabase
-                            .from('organization_knowledge')
-                            .select('content')
-                            .limit(1)
-                            .maybeSingle();
-                        const businessContext = knowledge?.content || "";
-
-                        console.log(`AI: Processing message for ${contactToAnalyze.id}...`);
-
-                        try {
-                            // ONE SINGLE CALL for everything (Saves 50% quota)
-                            const fullResult = await ai.processFullEnrichment(unifiedMessage.body, contactToAnalyze, businessContext);
-
-                            const { analysis, advice: salesAdvice } = fullResult;
-
-                            if (analysis || salesAdvice) {
-                                const updateData: any = {};
-                                const existingMetadata = contactToAnalyze.metadata || {};
-
-                                if (analysis) {
-                                    const currentTags = contactToAnalyze.tags || [];
-                                    updateData.tags = Array.from(new Set([...currentTags, ...analysis.tags]));
-
-                                    const isVal = (val: any) => val && val !== 'null' && val !== 'undefined';
-                                    if (isVal(analysis.extracted_data.first_name)) updateData.first_name = analysis.extracted_data.first_name;
-                                    if (isVal(analysis.extracted_data.last_name)) updateData.last_name = analysis.extracted_data.last_name;
-                                    if (isVal(analysis.extracted_data.email)) updateData.email = analysis.extracted_data.email;
-                                    if (isVal(analysis.extracted_data.phone)) updateData.phone = String(analysis.extracted_data.phone);
-                                }
-
-                                updateData.metadata = {
-                                    ...existingMetadata,
-                                    ...(analysis?.extracted_data?.company ? { company: analysis.extracted_data.company } : {}),
-                                    ...(analysis?.extracted_data?.budget ? { estimated_budget: analysis.extracted_data.budget } : {}),
-                                    ...(analysis?.extracted_data?.summary ? { ai_summary: analysis.extracted_data.summary } : {}),
-                                    ai_sales_advice: {
-                                        ...salesAdvice,
-                                        suggested_status: analysis?.suggested_status || 'open'
-                                    },
-                                    last_analysis_at: new Date().toISOString(),
-                                    ai_error: null // Reset error on success
-                                };
-
-                                await supabase.from('contacts').update(updateData).eq('id', contactToAnalyze.id);
-                                console.log('AI Enrichment finished successfully');
-                            }
-                        } catch (enrichError: any) {
-                            console.error('AI Enrichment failed:', enrichError);
-                            await supabase.from('contacts').update({
-                                metadata: {
-                                    ...(currentContact?.metadata || {}),
-                                    ai_error: enrichError.message || 'Unknown error during AI enrichment'
-                                }
-                            }).eq('id', currentContact.id);
-                        }
-                    } catch (outerError: any) {
-                        console.error('Critical outer AI Enrichment failure:', outerError);
+                    if (!finalToken) {
+                        console.error('[BOT] CRITICAL: No Telegram Token found (neither in DB nor ENV). Cannot reply.');
+                        return NextResponse.json({ ok: true });
                     }
+
+                    // Re-initialize adapter with correct token
+                    const sendAdapter = new TelegramAdapter(finalToken);
+
+                    // Sending "Typing..."
+                    try {
+                        await sendAdapter.sendTextMessage(unifiedMessage.chatId, "<i>Escribiendo...</i>");
+                    } catch (typingError) {
+                        console.error('[BOT] Error sending typing indicator:', typingError);
+                    }
+
+                    // --- NEW CONVERSATION WELCOME MENU ---
+                    // If this is the VERY FIRST message of a new conversation (created just now), send the Menu.
+                    // We can check if unread_count is 1 (the message we just inserted).
+
+                    if (conversation.unread_count === 1) {
+                        console.log('[BOT] New Conversation detected directly. Sending Welcome Menu.');
+                        try {
+                            await sendAdapter.sendInteractiveMenu(unifiedMessage.chatId, {
+                                text: `Hola ${unifiedMessage.senderName} 👋 Bienvenido a NexusCRM.\n\nSoy tu asistente virtual. ¿En qué puedo ayudarte hoy?`,
+                                options: [
+                                    { label: "📦 Ver Productos", value: "info_products" },
+                                    { label: "💲 Consultar Precios", value: "info_prices" },
+                                    { label: "🆘 Soporte Técnico", value: "help_support" },
+                                    { label: "👤 Hablar con Asesor", value: "agent_handover" }
+                                ]
+                            });
+                            // We STOP here? Or we also process the text?
+                            // If the user text was just "Hola", the menu is enough.
+                            // If the user text was "Precio de X", we should probably answer that too.
+                            // Let's analyze intent anyway, but maybe prioritizing the Menu if Intent is 'general'.
+                        } catch (menuError) {
+                            console.error('[BOT] Error sending Welcome Menu:', menuError);
+                        }
+                    }
+
+                    // 1. Get Knowledge Base
+
+                    const { data: knowledge } = await supabase
+                        .from('organization_knowledge')
+                        .select('content')
+                        .limit(1)
+                        .maybeSingle();
+                    const businessContext = knowledge?.content || "";
+
+                    // 2. Analyze Intent
+                    try {
+                        console.log(`[BOT] Analyzing intent for message: "${unifiedMessage.body}"`);
+                        const fullResult = await ai.processFullEnrichment(unifiedMessage.body, currentContact, businessContext);
+                        let intent = fullResult?.analysis?.intent || 'general';
+
+                        console.log(`[BOT] Intent Detected: ${intent}`);
+
+                        // Override Intent if it's a specific Button Click (Callback)
+                        // Note: Adapter currently returns callback content as "top level" body if parsed that way.
+                        // Ideally we check unifiedMessage.isCallback or unifiedMessage.callbackData
+                        if (unifiedMessage.body.includes("info_products")) intent = 'bot_query'; // simplification
+                        // Better: check logic below.
+
+                        // 3. Routing Logic
+                        if (intent === 'support_request') {
+                            // --- SUPPORT FLOW ---
+                            const { data: company } = await supabase.from('companies').select('support_email').eq('id', companyId).single();
+                            const supportEmail = company?.support_email;
+
+                            if (supportEmail) {
+                                await emailService.sendSupportTicket(
+                                    supportEmail,
+                                    currentContact,
+                                    unifiedMessage.body,
+                                    conversation.id
+                                );
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "✅ <b>Ticket de Soporte Creado</b>\n\nHemos enviado tu reporte a nuestro equipo técnico. Te contactaremos por correo pronto.");
+                            } else {
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "⚠️ No pudimos crear el ticket (Falta config de email). Un asesor revisará este chat pronto.");
+                            }
+
+                        } else if (intent === 'handover_request') {
+                            // --- HANDOVER FLOW ---
+                            // Round Robin Assignment
+                            const { data: assignments } = await supabase.rpc('get_agent_load', { org_id: companyId });
+                            let assignedAgentId = null;
+
+                            if (assignments && assignments.length > 0) {
+                                assignedAgentId = assignments[0].agent_id;
+                            } else {
+                                // Fallback: Pick any agent
+                                const { data: agents } = await supabase.from('profiles').select('id').eq('company_id', companyId).eq('role', 'agent').limit(1);
+                                if (agents && agents.length > 0) assignedAgentId = agents[0].id;
+                            }
+
+                            if (assignedAgentId) {
+                                await supabase.from('conversations').update({ assigned_to: assignedAgentId }).eq('id', conversation.id);
+                                await supabase.from('contacts').update({ assigned_to: assignedAgentId }).eq('id', currentContact.id);
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "👨‍💻 <b>Conectando con un asesor...</b>\n\nHe asignado tu conversación a un especialista. Te responderá en breve.");
+                            } else {
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "Lo siento, no hay asesores disponibles en este momento. Dejanos tu mensaje.");
+                            }
+
+                        } else if (intent === 'bot_query') {
+                            // --- KNOWLEDGE ANSWER ---
+                            const queryType = unifiedMessage.body.toLowerCase().includes('precio') ? 'prices' : 'products';
+                            const answer = await ai.getKnowledgeResponse(unifiedMessage.body, businessContext, queryType);
+
+                            console.log('[BOT] Sending Knowledge Answer.');
+                            await sendAdapter.sendTextMessage(unifiedMessage.chatId, answer);
+                        } else {
+                            // --- GENERAL / FALLBACK ---
+                            // If it's the FIRST message, we already sent the Menu. Do we send text too?
+                            // If intent is 'general' and unread_count === 1, we might skip sending another generic "Hola".
+                            if (conversation.unread_count > 1) {
+                                const reply = fullResult?.advice?.suggested_replies?.[0] || "Hola, ¿en qué puedo ayudarte hoy?";
+                                console.log('[BOT] Sending General Reply.');
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, reply);
+                            } else {
+                                console.log('[BOT] Skipping General Reply (Welcome Menu already sent).');
+                            }
+                        }
+
+                        // 4. Save metadata update
+                        if (fullResult?.analysis) {
+                            const updateData: any = {
+                                metadata: {
+                                    ...(currentContact.metadata || {}),
+                                    last_intent: intent,
+                                    last_ai_analysis: new Date().toISOString()
+                                }
+                            };
+                            await supabase.from('contacts').update(updateData).eq('id', currentContact.id);
+                        }
+                    } catch (aiError: any) {
+                        console.error('[BOT] AI Service Failed:', aiError);
+                        // Fallback response using the correct adapter
+                        await sendAdapter.sendTextMessage(unifiedMessage.chatId, "👨‍💻 Hola. He recibido tu mensaje. En un momento un asesor te atenderá.");
+                    }
+
+
                 }
             }
         }
