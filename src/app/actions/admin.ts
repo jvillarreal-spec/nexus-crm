@@ -192,7 +192,8 @@ export async function closeConversation(conversationId: string) {
 
         if (companyToken && chatId) {
             const telegram = new TelegramAdapter(companyToken);
-            await telegram.sendTextMessage(chatId, "Has finalizado tu conversación con el asesor, vuelve pronto, estamos para ayudarte 👋");
+            await telegram.sendTextMessage(chatId, "Tu asesor finalizó la conversación, recuerda que puedes volver cuando quieras 👋");
+
         }
 
         return { success: true };
