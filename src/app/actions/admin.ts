@@ -166,16 +166,19 @@ export async function updateSupportEmail(companyId: string, email: string) {
 }
 export async function closeConversation(conversationId: string) {
     try {
-        // 1. Get conversation and contact details to send the message
+        console.log('[closeConversation] Starting for:', conversationId);
+
+        // 1. Get conversation to find contact_id and company_id
         const { data: conversation, error: fetchError } = await supabaseAdmin
             .from('conversations')
-            .select('contact_id, contacts(channel_id, companies(telegram_token))')
+            .select('contact_id, company_id')
             .eq('id', conversationId)
             .single();
 
         if (fetchError || !conversation) {
-            throw new Error('Conversation not found');
+            throw new Error('Conversation not found: ' + fetchError?.message);
         }
+        console.log('[closeConversation] Conversation:', conversation);
 
         // 2. Update status to closed
         const { error: updateError } = await supabaseAdmin
@@ -185,15 +188,36 @@ export async function closeConversation(conversationId: string) {
 
         if (updateError) throw updateError;
 
-        // 3. Send Closing Message via Telegram
-        const contact = conversation.contacts as any;
-        const companyToken = contact?.companies?.telegram_token;
+        // 3. Get contact channel_id (Telegram chat ID)
+        const { data: contact, error: contactError } = await supabaseAdmin
+            .from('contacts')
+            .select('channel_id')
+            .eq('id', conversation.contact_id)
+            .single();
+
+        console.log('[closeConversation] Contact:', contact, 'Error:', contactError);
+
+        // 4. Get company telegram_token
+        const { data: company, error: companyError } = await supabaseAdmin
+            .from('companies')
+            .select('telegram_token')
+            .eq('id', conversation.company_id)
+            .single();
+
+        console.log('[closeConversation] Company token found:', !!company?.telegram_token, 'Error:', companyError);
+
+        // 5. Send Closing Message via Telegram
+        const companyToken = company?.telegram_token;
         const chatId = contact?.channel_id;
+
+        console.log('[closeConversation] Sending farewell. chatId:', chatId, 'hasToken:', !!companyToken);
 
         if (companyToken && chatId) {
             const telegram = new TelegramAdapter(companyToken);
             await telegram.sendTextMessage(chatId, "Tu asesor finalizó la conversación, recuerda que puedes volver cuando quieras 👋");
-
+            console.log('[closeConversation] Farewell message sent successfully');
+        } else {
+            console.warn('[closeConversation] Could not send farewell - missing token or chatId');
         }
 
         return { success: true };
@@ -202,6 +226,7 @@ export async function closeConversation(conversationId: string) {
         return { success: false, error: error.message };
     }
 }
+
 
 export async function updateBusinessHours(companyId: string, businessHours: object, timezone: string) {
     try {
