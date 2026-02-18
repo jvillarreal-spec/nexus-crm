@@ -168,10 +168,10 @@ export async function closeConversation(conversationId: string) {
     try {
         console.log('[closeConversation] Starting for:', conversationId);
 
-        // 1. Get conversation to find contact_id and company_id
+        // 1. Get conversation to find contact_id
         const { data: conversation, error: fetchError } = await supabaseAdmin
             .from('conversations')
-            .select('contact_id, company_id')
+            .select('contact_id')
             .eq('id', conversationId)
             .single();
 
@@ -188,20 +188,20 @@ export async function closeConversation(conversationId: string) {
 
         if (updateError) throw updateError;
 
-        // 3. Get contact channel_id (Telegram chat ID)
+        // 3. Get contact: channel_id (Telegram chat ID) AND company_id
         const { data: contact, error: contactError } = await supabaseAdmin
             .from('contacts')
-            .select('channel_id')
+            .select('channel_id, company_id')
             .eq('id', conversation.contact_id)
             .single();
 
         console.log('[closeConversation] Contact:', contact, 'Error:', contactError);
 
-        // 4. Get company telegram_token
+        // 4. Get company telegram_token using company_id from contact
         const { data: company, error: companyError } = await supabaseAdmin
             .from('companies')
             .select('telegram_token')
-            .eq('id', conversation.company_id)
+            .eq('id', contact?.company_id)
             .single();
 
         console.log('[closeConversation] Company token found:', !!company?.telegram_token, 'Error:', companyError);
@@ -229,6 +229,7 @@ export async function closeConversation(conversationId: string) {
 
 
 export async function updateBusinessHours(companyId: string, businessHours: object, timezone: string) {
+
     try {
         const { error } = await supabaseAdmin
             .from('companies')
