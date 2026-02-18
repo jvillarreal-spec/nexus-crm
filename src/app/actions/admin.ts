@@ -201,3 +201,19 @@ export async function closeConversation(conversationId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function updateBusinessHours(companyId: string, businessHours: object, timezone: string) {
+    try {
+        const { error } = await supabaseAdmin
+            .from('companies')
+            .update({ business_hours: businessHours, timezone })
+            .eq('id', companyId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating business hours:', error);
+        return { success: false, error: error.message };
+    }
+}
+

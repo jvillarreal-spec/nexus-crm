@@ -1,10 +1,30 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen } from 'lucide-react';
+import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen, Clock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { updateCompanyBot, updateSupportEmail } from '@/app/actions/admin';
+import { updateCompanyBot, updateSupportEmail, updateBusinessHours } from '@/app/actions/admin';
 import { cn } from '@/lib/utils';
+
+const DAYS = [
+    { key: 'monday', label: 'Lunes' },
+    { key: 'tuesday', label: 'Martes' },
+    { key: 'wednesday', label: 'Miércoles' },
+    { key: 'thursday', label: 'Jueves' },
+    { key: 'friday', label: 'Viernes' },
+    { key: 'saturday', label: 'Sábado' },
+    { key: 'sunday', label: 'Domingo' },
+];
+
+const DEFAULT_HOURS = {
+    monday: { start: '09:00', end: '18:00', enabled: true },
+    tuesday: { start: '09:00', end: '18:00', enabled: true },
+    wednesday: { start: '09:00', end: '18:00', enabled: true },
+    thursday: { start: '09:00', end: '18:00', enabled: true },
+    friday: { start: '09:00', end: '18:00', enabled: true },
+    saturday: { start: '09:00', end: '13:00', enabled: true },
+    sunday: { start: '09:00', end: '18:00', enabled: false },
+};
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('profile');
@@ -21,6 +41,10 @@ export default function SettingsPage() {
     // Notification State
     const [supportEmail, setSupportEmail] = useState('');
 
+    // Business Hours State
+    const [businessHours, setBusinessHours] = useState<any>(DEFAULT_HOURS);
+    const [timezone, setTimezone] = useState('America/Bogota');
+
     useEffect(() => {
         async function loadData() {
             const { data: { user } } = await supabase.auth.getUser();
@@ -35,6 +59,10 @@ export default function SettingsPage() {
                     setBotToken(profileData.companies.telegram_token || '');
                     setBotSecret(profileData.companies.telegram_secret_token || '');
                     setSupportEmail(profileData.companies.support_email || '');
+                    if (profileData.companies.business_hours) {
+                        setBusinessHours(profileData.companies.business_hours);
+                    }
+                    setTimezone(profileData.companies.timezone || 'America/Bogota');
                 }
             }
             setLoading(false);
@@ -72,6 +100,26 @@ export default function SettingsPage() {
         setSaving(false);
     };
 
+    const handleSaveBusinessHours = async () => {
+        if (!profile?.company_id) return;
+        setSaving(true);
+        setMessage(null);
+        const result = await updateBusinessHours(profile.company_id, businessHours, timezone);
+        if (result.success) {
+            setMessage({ type: 'success', text: 'Horarios de atención guardados con éxito.' });
+        } else {
+            setMessage({ type: 'error', text: result.error || 'Error al guardar horarios.' });
+        }
+        setSaving(false);
+    };
+
+    const updateDay = (day: string, field: string, value: any) => {
+        setBusinessHours((prev: any) => ({
+            ...prev,
+            [day]: { ...prev[day], [field]: value }
+        }));
+    };
+
     if (loading) return <div className="p-8 text-[#8b8fa3]">Cargando...</div>;
 
     const isAdmin = profile?.role === 'org_admin' || profile?.role === 'super_admin';
@@ -105,6 +153,12 @@ export default function SettingsPage() {
                                 label="Notificaciones"
                                 active={activeTab === 'notifications'}
                                 onClick={() => setActiveTab('notifications')}
+                            />
+                            <TabItem
+                                icon={<Clock size={18} />}
+                                label="Horarios"
+                                active={activeTab === 'hours'}
+                                onClick={() => setActiveTab('hours')}
                             />
                         </>
                     )}
@@ -294,6 +348,111 @@ export default function SettingsPage() {
                                     {saving ? 'Guardando...' : 'Guardar y Activar Bot'}
                                 </button>
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'hours' && (
+                        <div className="bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] p-8 shadow-xl">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Clock className="text-[#2AABEE]" />
+                                        Horarios de Atención
+                                    </h3>
+                                    <p className="text-sm text-[#8b8fa3] mt-2 max-w-md">
+                                        Define cuándo están disponibles tus asesores. Fuera de estos horarios, el Bot pedirá los datos del cliente.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 mb-6">
+                                {DAYS.map(({ key, label }) => {
+                                    const day = businessHours[key] || { start: '09:00', end: '18:00', enabled: false };
+                                    return (
+                                        <div key={key} className={cn(
+                                            "flex items-center gap-4 p-4 rounded-2xl border transition-all",
+                                            day.enabled
+                                                ? "bg-[#11131c] border-[#2AABEE]/30"
+                                                : "bg-[#11131c]/50 border-[#2a2e3d] opacity-60"
+                                        )}>
+                                            {/* Toggle */}
+                                            <button
+                                                onClick={() => updateDay(key, 'enabled', !day.enabled)}
+                                                className={cn(
+                                                    "relative w-10 h-6 rounded-full transition-all shrink-0",
+                                                    day.enabled ? "bg-[#2AABEE]" : "bg-[#2a2e3d]"
+                                                )}
+                                            >
+                                                <span className={cn(
+                                                    "absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all",
+                                                    day.enabled ? "left-5" : "left-1"
+                                                )} />
+                                            </button>
+
+                                            {/* Day label */}
+                                            <span className="w-24 text-sm font-bold text-white shrink-0">{label}</span>
+
+                                            {/* Time pickers */}
+                                            {day.enabled ? (
+                                                <div className="flex items-center gap-2 flex-1">
+                                                    <input
+                                                        type="time"
+                                                        value={day.start}
+                                                        onChange={(e) => updateDay(key, 'start', e.target.value)}
+                                                        className="bg-[#1a1d27] border border-[#2a2e3d] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-[#2AABEE] transition-colors"
+                                                    />
+                                                    <span className="text-[#4a4e5d] text-sm">—</span>
+                                                    <input
+                                                        type="time"
+                                                        value={day.end}
+                                                        onChange={(e) => updateDay(key, 'end', e.target.value)}
+                                                        className="bg-[#1a1d27] border border-[#2a2e3d] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-[#2AABEE] transition-colors"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-[#4a4e5d] font-bold uppercase tracking-widest">Cerrado</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-[#4a4e5d] mb-2">Zona Horaria</label>
+                                <select
+                                    value={timezone}
+                                    onChange={(e) => setTimezone(e.target.value)}
+                                    className="w-full bg-[#11131c] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-colors text-sm"
+                                >
+                                    <option value="America/Bogota">América/Bogotá (COT)</option>
+                                    <option value="America/Mexico_City">América/Ciudad de México (CST)</option>
+                                    <option value="America/Lima">América/Lima (PET)</option>
+                                    <option value="America/Santiago">América/Santiago (CLT)</option>
+                                    <option value="America/Buenos_Aires">América/Buenos Aires (ART)</option>
+                                    <option value="America/Caracas">América/Caracas (VET)</option>
+                                    <option value="America/New_York">América/Nueva York (EST)</option>
+                                    <option value="Europe/Madrid">Europa/Madrid (CET)</option>
+                                </select>
+                            </div>
+
+                            {message && (
+                                <div className={cn(
+                                    "p-4 rounded-xl flex items-center gap-2 text-sm font-bold animate-in slide-in-from-top-2 mb-4",
+                                    message.type === 'success' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                                )}>
+                                    {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                    {message.text}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleSaveBusinessHours}
+                                disabled={saving}
+                                className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#2AABEE] disabled:bg-[#2AABEE]/50 text-white px-8 py-3 rounded-xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                                {saving ? <Loader2 size={18} className="animate-spin" /> : <Clock size={18} />}
+                                {saving ? 'Guardando...' : 'Guardar Horarios'}
+                            </button>
                         </div>
                     )}
                 </div>
