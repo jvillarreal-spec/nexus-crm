@@ -237,9 +237,29 @@ export async function POST(request: NextRequest) {
 
                         } else if (intent === 'handover_request') {
                             // --- HANDOVER FLOW ---
-                            // Round Robin Assignment
-                            const { data: assignments } = await supabase.rpc('get_agent_load', { org_id: companyId });
+
+                            // 1. Check Business Hours & Agent Load
+                            // Function is_business_open and get_agent_load must be accessible via RPC or query
+                            // Since we can't easily call PLPGSQL function directly from JS client without RPC,
+                            // we can query the company settings directly or use RPC if exposed.
+                            // For simplicity/robustness, let's fetch settings and do logic here OR use the simple RPC created.
+
+                            const { data: isOpen } = await supabase.rpc('is_business_open', { company_id: companyId });
+
                             let assignedAgentId = null;
+
+                            if (isOpen === false) {
+                                // CLOSED - Immediate Fallback
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "🌙 <b>Actualmente estamos fuera de horario laboral.</b>\n\nPor favor, déjanos tu <b>Nombre, Teléfono y Correo</b>. Te contactaremos tan pronto abramos. 🕒");
+                                return NextResponse.json({ ok: true });
+                            }
+
+                            // Round Robin Assignment (only if open)
+                            const { data: assignments } = await supabase.rpc('get_agent_load', { org_id: companyId });
+
+                            // The variable is already declared above
+                            assignedAgentId = null;
+
 
                             if (assignments && assignments.length > 0) {
                                 assignedAgentId = assignments[0].agent_id;
@@ -254,8 +274,9 @@ export async function POST(request: NextRequest) {
                                 await supabase.from('contacts').update({ assigned_to: assignedAgentId }).eq('id', currentContact.id);
                                 await sendAdapter.sendTextMessage(unifiedMessage.chatId, "👨‍💻 <b>Conectando con un asesor...</b>\n\nHe asignado tu conversación a un especialista. Te responderá en breve.");
                             } else {
-                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "Lo siento, no hay asesores disponibles en este momento. Dejanos tu mensaje.");
+                                await sendAdapter.sendTextMessage(unifiedMessage.chatId, "⚠️ <b>Nuestros asesores no están disponibles en este momento.</b>\n\nPor favor, déjanos tu <b>Nombre, Teléfono y Correo</b> en un solo mensaje. Te contactaremos mañana a primera hora. 📝");
                             }
+
 
                         } else if (intent === 'bot_query') {
                             // --- KNOWLEDGE ANSWER ---
