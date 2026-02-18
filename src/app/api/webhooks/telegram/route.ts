@@ -302,8 +302,13 @@ export async function POST(request: NextRequest) {
                             if (assignments && assignments.length > 0) {
                                 assignedAgentId = assignments[0].agent_id;
                             } else {
-                                // Fallback: Pick any agent
-                                const { data: agents } = await supabase.from('profiles').select('id').eq('company_id', companyId).eq('role', 'agent').limit(1);
+                                // Fallback: Pick any user in the company (agent OR admin)
+                                const { data: agents } = await supabase
+                                    .from('profiles')
+                                    .select('id')
+                                    .eq('company_id', companyId)
+                                    .in('role', ['agent', 'org_admin', 'super_admin'])
+                                    .limit(1);
                                 if (agents && agents.length > 0) assignedAgentId = agents[0].id;
                             }
 
