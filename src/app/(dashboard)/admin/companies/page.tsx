@@ -13,7 +13,7 @@ import {
     Activity
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { createCompanyWithAdmin } from '@/app/actions/admin';
+import { createCompanyWithAdmin, updateCompany, resendWelcomeEmail } from '@/app/actions/admin';
 import { cn } from '@/lib/utils';
 
 export default function CompaniesPage() {
@@ -22,6 +22,8 @@ export default function CompaniesPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [editingCompany, setEditingCompany] = useState<any>(null);
+    const [isResending, setIsResending] = useState(false);
 
     const supabase = createClient();
 
@@ -45,16 +47,48 @@ export default function CompaniesPage() {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        const result = await createCompanyWithAdmin(data);
+        let result;
+        if (editingCompany) {
+            result = await updateCompany(editingCompany.id, {
+                name: data.companyName as string,
+                slug: data.companySlug as string
+            });
+        } else {
+            result = await createCompanyWithAdmin(data);
+        }
 
         if (result.success) {
             setIsModalOpen(false);
+            setEditingCompany(null);
             fetchCompanies();
         } else {
             alert('Error: ' + result.error);
         }
         setSubmitting(false);
     }
+
+    async function handleResendEmail() {
+        if (!editingCompany) return;
+        setIsResending(true);
+        const result = await resendWelcomeEmail(editingCompany.id);
+
+        if (result.success) {
+            alert('Correo de bienvenida reenviado con éxito.');
+        } else {
+            alert('Error al reenviar: ' + result.error);
+        }
+        setIsResending(false);
+    }
+
+    const openEditModal = (company: any) => {
+        setEditingCompany(company);
+        setIsModalOpen(true);
+    };
+
+    const openCreateModal = () => {
+        setEditingCompany(null);
+        setIsModalOpen(true);
+    };
 
     const filteredCompanies = companies.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -69,7 +103,7 @@ export default function CompaniesPage() {
                     <p className="text-[#8b8fa3] mt-1">Control centralizado de organizaciones en NexusCRM</p>
                 </div>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={openCreateModal}
                     className="flex items-center justify-center gap-2 bg-[#2AABEE] hover:bg-[#2AABEE]/90 text-white px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-[#2AABEE]/20"
                 >
                     <Plus size={20} />
@@ -160,7 +194,10 @@ export default function CompaniesPage() {
                             </div>
 
                             <div className="mt-8 flex gap-3">
-                                <button className="flex-1 bg-[#232732] hover:bg-[#2AABEE] text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                                <button
+                                    onClick={() => openEditModal(company)}
+                                    className="flex-1 bg-[#232732] hover:bg-[#2AABEE] text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                                >
                                     Administrar
                                 </button>
                                 <button className="p-3 bg-[#232732] hover:text-[#2AABEE] rounded-xl text-[#4a4e5d] transition-all">
@@ -181,8 +218,12 @@ export default function CompaniesPage() {
                     />
                     <div className="relative w-full max-w-xl bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-8 border-b border-[#2a2e3d]">
-                            <h2 className="text-2xl font-black text-white">Nueva Empresa</h2>
-                            <p className="text-[#8b8fa3]">Configura la organización y su administrador principal</p>
+                            <h2 className="text-2xl font-black text-white">
+                                {editingCompany ? 'Editar Empresa' : 'Nueva Empresa'}
+                            </h2>
+                            <p className="text-[#8b8fa3]">
+                                {editingCompany ? 'Modifica los datos de la organización' : 'Configura la organización y su administrador principal'}
+                            </p>
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -194,6 +235,7 @@ export default function CompaniesPage() {
                                         <input
                                             name="companyName"
                                             required
+                                            defaultValue={editingCompany?.name}
                                             className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
                                             placeholder="Ej: Inmobiliaria Nexus"
                                         />
@@ -204,54 +246,79 @@ export default function CompaniesPage() {
                                     <input
                                         name="companySlug"
                                         required
+                                        defaultValue={editingCompany?.slug}
                                         className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
                                         placeholder="ej-inmobiliaria"
                                     />
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-[#2a2e3d]">
-                                <h3 className="text-sm font-black uppercase tracking-widest text-[#2AABEE] mb-4">Administrador Principal</h3>
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-[#8b8fa3]">Nombre Completo</label>
-                                        <div className="relative">
-                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d]" size={18} />
-                                            <input
-                                                name="adminName"
-                                                required
-                                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
-                                                placeholder="Juan Perez"
-                                            />
+                            {editingCompany && (
+                                <div className="p-6 bg-[#2AABEE]/5 border border-[#2AABEE]/10 rounded-2xl space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-[#2AABEE]/10 rounded-lg text-[#2AABEE]">
+                                            <Mail size={18} />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-white">Acciones de Correo</h4>
+                                            <p className="text-[11px] text-[#8b8fa3]">Reenvía las credenciales y el link de acceso al administrador.</p>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={handleResendEmail}
+                                        disabled={isResending}
+                                        className="w-full bg-[#232732] hover:bg-[#2AABEE]/20 hover:text-[#2AABEE] text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all inline-flex items-center justify-center gap-2 border border-[#2a2e3d]"
+                                    >
+                                        {isResending ? 'Enviando...' : 'Reenviar Bienvenida'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {!editingCompany && (
+                                <div className="pt-4 border-t border-[#2a2e3d]">
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-[#2AABEE] mb-4">Administrador Principal</h3>
+                                    <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-[#8b8fa3]">Email</label>
+                                            <label className="text-xs font-bold text-[#8b8fa3]">Nombre Completo</label>
                                             <div className="relative">
-                                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d]" size={18} />
+                                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d]" size={18} />
                                                 <input
-                                                    name="adminEmail"
-                                                    type="email"
-                                                    required
+                                                    name="adminName"
+                                                    required={!editingCompany}
                                                     className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
-                                                    placeholder="admin@empresa.com"
+                                                    placeholder="Juan Perez"
                                                 />
                                             </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-[#8b8fa3]">Password Temporal</label>
-                                            <input
-                                                name="adminPassword"
-                                                type="password"
-                                                required
-                                                className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
-                                                placeholder="••••••••"
-                                            />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-[#8b8fa3]">Email</label>
+                                                <div className="relative">
+                                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#4a4e5d]" size={18} />
+                                                    <input
+                                                        name="adminEmail"
+                                                        type="email"
+                                                        required={!editingCompany}
+                                                        className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
+                                                        placeholder="admin@empresa.com"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-[#8b8fa3]">Password Temporal</label>
+                                                <input
+                                                    name="adminPassword"
+                                                    type="password"
+                                                    required={!editingCompany}
+                                                    className="w-full bg-[#0f1117] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-all"
+                                                    placeholder="••••••••"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="flex gap-4 pt-4">
                                 <button
@@ -266,7 +333,7 @@ export default function CompaniesPage() {
                                     disabled={submitting}
                                     className="flex-1 bg-[#2AABEE] hover:bg-[#2AABEE]/90 disabled:opacity-50 text-white px-6 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-[#2AABEE]/20 flex items-center justify-center gap-2"
                                 >
-                                    {submitting ? 'Creando...' : 'Crear Empresa'}
+                                    {submitting ? 'Guardando...' : editingCompany ? 'Guardar Cambios' : 'Crear Empresa'}
                                 </button>
                             </div>
                         </form>

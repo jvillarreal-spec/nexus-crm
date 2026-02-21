@@ -2,6 +2,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { TelegramAdapter } from '@/lib/channels/telegram/telegram.adapter';
+import { EmailService } from '@/lib/email/email.service';
+
+const emailService = new EmailService();
 
 
 const supabaseAdmin = createClient(
@@ -43,6 +46,11 @@ export async function createCompanyWithAdmin(formData: any) {
         if (authError) throw authError;
 
         // 3. Profiles table is updated automatically by the trigger we created in migration!
+
+        // 4. Send Welcome Email (Non-blocking)
+        emailService.sendCompanyWelcomeEmail(adminEmail, adminName, companyName).catch(err => {
+            console.error('Failed to send welcome email:', err);
+        });
 
         return { success: true, company };
     } catch (error: any) {
@@ -240,6 +248,68 @@ export async function updateBusinessHours(companyId: string, businessHours: obje
         return { success: true };
     } catch (error: any) {
         console.error('Error updating business hours:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateCompany(companyId: string, data: { name: string, slug: string }) {
+    try {
+        const { error } = await supabaseAdmin
+            .from('companies')
+            .update({
+                name: data.name,
+                slug: data.slug
+            })
+            .eq('id', companyId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating company:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function resendWelcomeEmail(companyId: string) {
+    try {
+        // 1. Get Company Details
+        const { data: company, error: compError } = await supabaseAdmin
+            .from('companies')
+            .select('name')
+            .eq('id', companyId)
+            .single();
+
+        if (compError) throw compError;
+
+        // 2. Get Admin details (first org_admin found for this company)
+        const { data: profile, error: profError } = await supabaseAdmin
+            .from('profiles')
+            .select('email, full_name')
+            .eq('company_id', companyId)
+            .eq('role', 'org_admin')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single();
+
+        if (profError) {
+            if (profError.code === 'PGRST116') {
+                throw new Error('No se encontró un administrador configurado para esta empresa.');
+            }
+            throw profError;
+        }
+
+        // 3. Resend the email
+        const success = await emailService.sendCompanyWelcomeEmail(
+            profile.email,
+            profile.full_name || 'Administrador',
+            company.name
+        );
+
+        if (!success) throw new Error('Error al enviar el correo a través del servicio.');
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error resending welcome email:', error);
         return { success: false, error: error.message };
     }
 }
