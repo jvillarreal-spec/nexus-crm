@@ -48,8 +48,12 @@ export async function createCompanyWithAdmin(formData: any) {
         // 3. Profiles table is updated automatically by the trigger we created in migration!
 
         // 4. Send Welcome Email (Non-blocking)
-        emailService.sendCompanyWelcomeEmail(adminEmail, adminName, companyName).catch(err => {
-            console.error('Failed to send welcome email:', err);
+        emailService.sendCompanyWelcomeEmail(adminEmail, adminName, companyName).then(result => {
+            if (!result.success) {
+                console.error('Failed to send welcome email:', result.error);
+            }
+        }).catch(err => {
+            console.error('Critical failure sending welcome email:', err);
         });
 
         return { success: true, company };
@@ -333,13 +337,15 @@ export async function resendWelcomeEmail(companyId: string) {
         }
 
         // 4. Resend the email
-        const success = await emailService.sendCompanyWelcomeEmail(
+        const emailResult = await emailService.sendCompanyWelcomeEmail(
             profile.email,
             profile.full_name || 'Administrador',
             company.name
         );
 
-        if (!success) throw new Error('Error al enviar el correo a través del servicio.');
+        if (!emailResult.success) {
+            throw new Error(`Resend Error: ${emailResult.error}`);
+        }
 
         return { success: true };
     } catch (error: any) {

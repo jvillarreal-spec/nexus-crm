@@ -15,10 +15,10 @@ export class EmailService {
     /**
      * Sends a support ticket email to the company's support address.
      */
-    async sendSupportTicket(to: string, clientData: ClientData, issueDetails: string, conversationId: string): Promise<boolean> {
+    async sendSupportTicket(to: string, clientData: ClientData, issueDetails: string, conversationId: string): Promise<{ success: boolean; error?: string }> {
         if (!to) {
             console.error('EmailService: No support email provided.');
-            return false;
+            return { success: false, error: 'No se proporcionó un correo de soporte.' };
         }
 
         try {
@@ -56,24 +56,24 @@ export class EmailService {
 
             if (error) {
                 console.error('EmailService Error:', error);
-                return false;
+                return { success: false, error: error.message || JSON.stringify(error) };
             }
 
             console.log('EmailService: Support ticket sent successfully to', to);
-            return true;
-        } catch (error) {
+            return { success: true };
+        } catch (error: any) {
             console.error('EmailService Exception:', error);
-            return false;
+            return { success: false, error: error.message || 'Error inesperado en el servicio de email.' };
         }
     }
 
     /**
      * Sends a welcome email to a new company administrator.
      */
-    async sendCompanyWelcomeEmail(to: string, adminName: string, companyName: string): Promise<boolean> {
+    async sendCompanyWelcomeEmail(to: string, adminName: string, companyName: string): Promise<{ success: boolean; error?: string }> {
         if (!to) {
             console.error('EmailService: No target email provided.');
-            return false;
+            return { success: false, error: 'No se proporcionó un destinatario.' };
         }
 
         try {
@@ -122,14 +122,14 @@ export class EmailService {
 
             if (error) {
                 console.error('EmailService Error:', error);
-                return false;
+                return { success: false, error: error.message || JSON.stringify(error) };
             }
 
             console.log('EmailService: Welcome email sent successfully to', to);
-            return true;
-        } catch (error) {
+            return { success: true };
+        } catch (error: any) {
             console.error('EmailService Exception:', error);
-            return false;
+            return { success: false, error: error.message || 'Error inesperado en el servicio de email.' };
         }
     }
 }
