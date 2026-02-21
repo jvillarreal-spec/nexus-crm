@@ -281,24 +281,58 @@ export async function resendWelcomeEmail(companyId: string) {
 
         if (compError) throw compError;
 
-        // 2. Get Admin details (first org_admin found for this company)
-        const { data: profile, error: profError } = await supabaseAdmin
+        // 2. Try to get Admin details from profiles table
+        let { data: profile, error: profError } = await supabaseAdmin
             .from('profiles')
             .select('email, full_name')
             .eq('company_id', companyId)
             .eq('role', 'org_admin')
             .order('created_at', { ascending: true })
             .limit(1)
-            .single();
+            .maybeSingle();
 
-        if (profError) {
-            if (profError.code === 'PGRST116') {
-                throw new Error('No se encontró un administrador configurado para esta empresa.');
+        // 3. Self-healing: If no profile found, look in Supabase Auth
+        if (!profile) {
+            console.log(`[resendWelcomeEmail] No profile found for company ${companyId}. Attempting self-healing...`);
+
+            // List users from Auth to find the one assigned to this company as org_admin
+            const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+            if (listError) throw listError;
+
+            const authUser = users.find(u =>
+                u.user_metadata?.company_id === companyId &&
+                u.user_metadata?.role === 'org_admin'
+            );
+
+            if (!authUser) {
+                throw new Error('No se encontró un administrador en el sistema de autenticación para esta empresa.');
             }
-            throw profError;
+
+            console.log(`[resendWelcomeEmail] Found auth user ${authUser.id}. Re-creating profile...`);
+
+            // Re-create the missing profile
+            const { data: newProfile, error: insertError } = await supabaseAdmin
+                .from('profiles')
+                .insert({
+                    id: authUser.id,
+                    email: authUser.email,
+                    full_name: authUser.user_metadata?.full_name || 'Administrador',
+                    role: 'org_admin',
+                    company_id: companyId
+                })
+                .select('email, full_name')
+                .single();
+
+            if (insertError) throw insertError;
+            profile = newProfile;
+            console.log(`[resendWelcomeEmail] Self-healing successful for ${profile.email}`);
         }
 
-        // 3. Resend the email
+        if (!profile) {
+            throw new Error('No se encontró un administrador configurado para esta empresa.');
+        }
+
+        // 4. Resend the email
         const success = await emailService.sendCompanyWelcomeEmail(
             profile.email,
             profile.full_name || 'Administrador',

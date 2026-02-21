@@ -74,6 +74,7 @@ export default function CompaniesPage() {
 
         if (result.success) {
             alert('Correo de bienvenida reenviado con éxito.');
+            fetchCompanies(); // Refresh to show the newly created profile if self-healed
         } else {
             alert('Error al reenviar: ' + result.error);
         }
