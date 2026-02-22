@@ -27,7 +27,7 @@ import { createClient } from '@/lib/supabase/client';
 const ALL_NAV_ITEMS = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['super_admin', 'org_admin', 'agent'] },
     { name: 'Empresas', href: '/admin/companies', icon: Building2, roles: ['super_admin'] },
-    { name: 'Comerciales', href: '/admin/users', icon: UserPlus, roles: ['org_admin', 'super_admin'] },
+    { name: 'Equipo', href: '/admin/users', icon: UserPlus, roles: ['org_admin', 'super_admin'] },
     { name: 'Chat', href: '/chat', icon: MessageSquare, roles: ['org_admin', 'agent'] },
     { name: 'Contactos', href: '/contacts', icon: Users, roles: ['org_admin', 'agent'] },
     { name: 'Deals', href: '/deals', icon: Briefcase, roles: ['org_admin', 'agent'] },

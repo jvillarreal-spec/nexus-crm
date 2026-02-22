@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MessageCircle, Clock, CheckCircle2 } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle2, Shield } from 'lucide-react';
 
 interface ConversationListProps {
     onSelect: (id: string, contact: any) => void;
@@ -49,7 +49,7 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
         setError(null);
         const { data, error } = await supabase
             .from('conversations')
-            .select('*, contacts(*)')
+            .select('*, contacts(*), agent:profiles!conversations_assigned_to_fkey(full_name)')
             .eq('status', activeTab)
             .order('last_message_at', { ascending: false });
 
@@ -183,6 +183,14 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
                                             {conv.follow_up_at && activeTab === 'pending' ? 'Seguimiento programado' : 'Nueva conversación por Telegram'}
                                         </p>
                                     </div>
+                                    {conv.agent?.full_name && (
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#2AABEE]/10 border border-[#2AABEE]/20 rounded-md shrink-0">
+                                            <Shield size={10} className="text-[#2AABEE]" />
+                                            <span className="text-[9px] font-black text-[#2AABEE] uppercase tracking-wider truncate max-w-[80px]">
+                                                {conv.agent.full_name.split(' ')[0]}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-2 shrink-0">
                                         {/* SLA Warning: More than 15 mins unread */}
                                         {conv.unread_count > 0 && conv.last_message_at && (new Date().getTime() - new Date(conv.last_message_at).getTime() > 15 * 60 * 1000) && (

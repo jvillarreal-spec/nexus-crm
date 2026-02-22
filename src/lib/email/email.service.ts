@@ -146,4 +146,75 @@ export class EmailService {
             return { success: false, error: error.message || 'Error inesperado en el servicio de email.' };
         }
     }
+
+    /**
+     * Sends a welcome email to a new worker (agent) added to a company.
+     */
+    async sendWorkerWelcomeEmail(to: string, workerName: string, companyName: string, password?: string): Promise<{ success: boolean; error?: string }> {
+        if (!to) return { success: false, error: 'No email provided' };
+
+        try {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-crm-ulmv.vercel.app';
+
+            const passwordSection = password ? `
+                <div style="background-color: #f1f5f9; border: 1px dashed #cbd5e1; padding: 25px; margin: 30px 0; border-radius: 12px; text-align: center;">
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Tus Credenciales de Acceso</p>
+                    <div style="display: inline-block; text-align: left; background: white; padding: 15px 25px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <p style="margin: 0; font-family: monospace; font-size: 14px; color: #1e293b;"><strong>Email:</strong> ${to}</p>
+                        <p style="margin: 5px 0 0 0; font-family: monospace; font-size: 14px; color: #1e293b;"><strong>Clave:</strong> <span style="background-color: #fef9c3; padding: 2px 6px; border-radius: 4px; border: 1px solid #fef08a;">${password}</span></p>
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #ef4444; font-weight: bold;">* Se te pedirá cambiar esta clave al ingresar.</p>
+                </div>
+            ` : '';
+
+            await this.transporter.sendMail({
+                from: `"NexusCRM" <${process.env.GMAIL_USER}>`,
+                to: to,
+                subject: `¡Te has unido al equipo de ${companyName} en NexusCRM!`,
+                html: `
+                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1d27; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="background-color: #1a1d27; padding: 40px 20px; text-align: center;">
+                            <h1 style="color: #2AABEE; margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1px;">NexusCRM</h1>
+                            <p style="color: #8b8fa3; margin-top: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">Nuevo Miembro del Equipo</p>
+                        </div>
+                        
+                        <div style="padding: 40px; background-color: #ffffff;">
+                            <h2 style="color: #1a1d27; margin-top: 0;">¡Hola, ${workerName}!</h2>
+                            <p style="font-size: 16px; line-height: 1.6; color: #4a4e5d;">
+                                Tu administrador te ha invitado a unirte al equipo de <strong>${companyName}</strong> en <strong>NexusCRM</strong>.
+                            </p>
+                            
+                            ${passwordSection}
+
+                            <div style="background-color: #f8faff; border-left: 4px solid #2AABEE; padding: 20px; margin: 30px 0; border-radius: 8px;">
+                                <p style="margin: 0; font-size: 14px; color: #4a4e5d;">
+                                    <strong>Comienza a atender a tus clientes</strong><br>
+                                    Desde el panel podrás ver los chats de Telegram asignados a ti, responder mensajes y gestionar tus prospectos con ayuda de nuestra IA.
+                                </p>
+                            </div>
+
+                            <div style="text-align: center; margin-top: 40px;">
+                                <a href="${appUrl}/login" style="background-color: #2AABEE; color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Ingresar al Panel</a>
+                            </div>
+
+                            <p style="margin-top: 40px; font-size: 14px; color: #8b8fa3; text-align: center;">
+                                Si tienes problemas para ingresar, contacta al administrador de tu empresa.
+                            </p>
+                        </div>
+                        
+                        <div style="background-color: #f9f9f9; padding: 20px; text-align: center; border-top: 1px solid #eee;">
+                            <p style="margin: 0; font-size: 12px; color: #bbb;">
+                                &copy; 2026 NexusCRM. La plataforma de atención inteligente.
+                            </p>
+                        </div>
+                    </div>
+                `
+            });
+
+            return { success: true };
+        } catch (error: any) {
+            console.error('EmailService Error:', error);
+            return { success: false, error: error.message };
+        }
+    }
 }

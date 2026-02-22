@@ -374,3 +374,69 @@ export async function resendWelcomeEmail(companyId: string) {
         return { success: false, error: error.message };
     }
 }
+
+export async function createWorker(formData: { name: string; email: string }) {
+    try {
+        const { name, email } = formData;
+
+        // 1. Get current user session
+        const { createClient } = await import('@/lib/supabase/server');
+        const supabase = await createClient();
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+        if (!sessionUser) throw new Error('Unauthorized');
+
+        // 2. Get full user metadata via Admin API to ensure we have company_id/role
+        const { data: { user: currentUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
+
+        if (!currentUser || (currentUser.user_metadata.role !== 'org_admin' && currentUser.user_metadata.role !== 'super_admin')) {
+            throw new Error('Unauthorized');
+        }
+
+        const companyId = currentUser.user_metadata.company_id;
+
+        // 2. Get company name for the email
+        const { data: company } = await supabaseAdmin
+            .from('companies')
+            .select('name')
+            .eq('id', companyId)
+            .single();
+
+        if (!company) throw new Error('Company not found');
+
+        // 3. Generate password
+        const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
+
+        // 4. Create user in Auth
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password: tempPassword,
+            email_confirm: true,
+            user_metadata: {
+                full_name: name,
+                role: 'agent',
+                company_id: companyId,
+                new_account: true
+            }
+        });
+
+        if (authError) throw authError;
+
+        // 5. Send welcome email
+        const emailResult = await emailService.sendWorkerWelcomeEmail(
+            email,
+            name,
+            company.name,
+            tempPassword
+        );
+
+        if (!emailResult.success) {
+            console.error('Failed to send worker welcome email:', emailResult.error);
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error creating worker:', error);
+        return { success: false, error: error.message };
+    }
+}
