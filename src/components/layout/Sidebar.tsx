@@ -106,6 +106,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
                     {filteredNavItems.map((item) => {
                         const isActive = pathname.startsWith(item.href);
+                        const displayName = (item.href === '/admin/users' && userRole === 'super_admin')
+                            ? 'Usuarios'
+                            : item.name;
+
                         return (
                             <Link
                                 key={item.name}
@@ -119,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 )}
                             >
                                 <item.icon size={22} className={cn(isActive ? "text-white" : "text-[#8b8fa3]")} />
-                                {item.name}
+                                {displayName}
                             </Link>
                         );
                     })}

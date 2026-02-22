@@ -25,6 +25,7 @@ export default function UsersPage() {
     const [showModal, setShowModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
     const supabase = createClient();
 
     // Form state
@@ -40,19 +41,24 @@ export default function UsersPage() {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            // Get profile to get company_id
+            // Get profile to get company_id and role
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('company_id')
+                .select('company_id, role')
                 .eq('id', user.id)
                 .single();
 
-            if (profile?.company_id) {
-                const { data: teamMembers, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('company_id', profile.company_id)
-                    .order('created_at', { ascending: false });
+            setCurrentUserProfile(profile);
+
+            if (profile) {
+                let query = supabase.from('profiles').select('*, companies(name)');
+
+                // If not super_admin, filter by company_id
+                if (profile.role !== 'super_admin') {
+                    query = query.eq('company_id', profile.company_id);
+                }
+
+                const { data: teamMembers, error } = await query.order('created_at', { ascending: false });
 
                 if (error) throw error;
                 setUsers(teamMembers || []);
@@ -64,7 +70,14 @@ export default function UsersPage() {
         }
     }
 
+    const isSuperAdmin = currentUserProfile?.role === 'super_admin';
+    const pageTitle = isSuperAdmin ? 'Gestión Global de Usuarios' : 'Gestión de Equipo';
+    const pageDescription = isSuperAdmin
+        ? 'Visualiza y gestiona todos los usuarios registrados en la plataforma.'
+        : 'Administra los comerciales y sus permisos en la empresa.';
+
     const handleCreateWorker = async (e: React.FormEvent) => {
+        // ... (remains same)
         e.preventDefault();
         setSaving(true);
         setMessage(null);
@@ -86,16 +99,18 @@ export default function UsersPage() {
         <div className="max-w-6xl space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">Gestión de Equipo</h1>
-                    <p className="text-[#8b8fa3] mt-1">Administra los comerciales y sus permisos en la empresa.</p>
+                    <h1 className="text-3xl font-black text-white tracking-tight">{pageTitle}</h1>
+                    <p className="text-[#8b8fa3] mt-1">{pageDescription}</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center justify-center gap-2 bg-[#2AABEE] text-white px-6 py-3 rounded-2xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                >
-                    <UserPlus size={18} />
-                    Añadir Miembro
-                </button>
+                {!isSuperAdmin && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="flex items-center justify-center gap-2 bg-[#2AABEE] text-white px-6 py-3 rounded-2xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                        <UserPlus size={18} />
+                        Añadir Miembro
+                    </button>
+                )}
             </div>
 
             {message && !showModal && (
@@ -115,6 +130,9 @@ export default function UsersPage() {
                             <tr className="bg-[#11131c]">
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Nombre</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Email</th>
+                                {isSuperAdmin && (
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Empresa</th>
+                                )}
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Rol</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Estado</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#4a4e5d] text-right">Acciones</th>
@@ -123,15 +141,15 @@ export default function UsersPage() {
                         <tbody className="divide-y divide-[#2a2e3d]">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-[#8b8fa3]">
+                                    <td colSpan={isSuperAdmin ? 6 : 5} className="px-6 py-12 text-center text-[#8b8fa3]">
                                         <Loader2 className="animate-spin mx-auto mb-2" />
-                                        Cargando equipo...
+                                        Cargando usuarios...
                                     </td>
                                 </tr>
                             ) : users.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-[#8b8fa3]">
-                                        No hay miembros en el equipo aún.
+                                    <td colSpan={isSuperAdmin ? 6 : 5} className="px-6 py-12 text-center text-[#8b8fa3]">
+                                        No hay usuarios registrados aún.
                                     </td>
                                 </tr>
                             ) : (
@@ -148,6 +166,11 @@ export default function UsersPage() {
                                         <td className="px-6 py-4">
                                             <span className="text-sm text-[#8b8fa3]">{member.email}</span>
                                         </td>
+                                        {isSuperAdmin && (
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm text-[#2AABEE] font-medium">{member.companies?.name || 'Sistema'}</span>
+                                            </td>
+                                        )}
                                         <td className="px-6 py-4">
                                             <span className={cn(
                                                 "text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md",
