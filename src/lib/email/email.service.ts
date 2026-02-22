@@ -1,6 +1,4 @@
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import nodemailer from 'nodemailer';
 
 interface ClientData {
     first_name?: string;
@@ -12,6 +10,18 @@ interface ClientData {
 }
 
 export class EmailService {
+    private transporter;
+
+    constructor() {
+        this.transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_APP_PASSWORD,
+            },
+        });
+    }
+
     /**
      * Sends a support ticket email to the company's support address.
      */
@@ -22,9 +32,9 @@ export class EmailService {
         }
 
         try {
-            const { data, error } = await resend.emails.send({
-                from: 'NexusCRM Support <onboarding@resend.dev>', // Update this with a verified domain if available
-                to: [to],
+            const info = await this.transporter.sendMail({
+                from: `"NexusCRM Support" <${process.env.GMAIL_USER}>`,
+                to: to,
                 subject: `🔥 Nuevo Ticket de Soporte - ${clientData.first_name || 'Cliente'} (${clientData.channel_id})`,
                 html: `
                     <div style="font-family: Arial, sans-serif; color: #333;">
@@ -54,15 +64,10 @@ export class EmailService {
                 `
             });
 
-            if (error) {
-                console.error('EmailService Error:', error);
-                return { success: false, error: error.message || JSON.stringify(error) };
-            }
-
             console.log('EmailService: Support ticket sent successfully to', to);
             return { success: true };
         } catch (error: any) {
-            console.error('EmailService Exception:', error);
+            console.error('EmailService Error:', error);
             return { success: false, error: error.message || 'Error inesperado en el servicio de email.' };
         }
     }
@@ -78,9 +83,9 @@ export class EmailService {
 
         try {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-crm-ulmv.vercel.app';
-            const { data, error } = await resend.emails.send({
-                from: 'NexusCRM <onboarding@resend.dev>',
-                to: [to],
+            const info = await this.transporter.sendMail({
+                from: `"NexusCRM" <${process.env.GMAIL_USER}>`,
+                to: to,
                 subject: `¡Bienvenido a NexusCRM, ${companyName}!`,
                 html: `
                     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1a1d27; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 20px; overflow: hidden shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -120,15 +125,10 @@ export class EmailService {
                 `
             });
 
-            if (error) {
-                console.error('EmailService Error:', error);
-                return { success: false, error: error.message || JSON.stringify(error) };
-            }
-
             console.log('EmailService: Welcome email sent successfully to', to);
             return { success: true };
         } catch (error: any) {
-            console.error('EmailService Exception:', error);
+            console.error('EmailService Error:', error);
             return { success: false, error: error.message || 'Error inesperado en el servicio de email.' };
         }
     }
