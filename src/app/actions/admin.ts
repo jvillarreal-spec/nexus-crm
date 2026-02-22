@@ -440,3 +440,118 @@ export async function createWorker(formData: { name: string; email: string }) {
         return { success: false, error: error.message };
     }
 }
+
+export async function updateUserStatus(userId: string, status: 'active' | 'inactive') {
+    try {
+        // 1. Get current user session
+        const { createClient: createServerClient } = await import('@/lib/supabase/server');
+        const supabase = await createServerClient();
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+        if (!sessionUser) throw new Error('Unauthorized');
+
+        // 2. Verify Super Admin status
+        const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
+        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+            throw new Error('Unauthorized');
+        }
+
+        // 3. Update Profile status
+        const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (profileError) throw profileError;
+
+        // 4. Update Auth User (Ban/Unban)
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+            userId,
+            {
+                ban_duration: status === 'inactive' ? '876000h' : 'none', // Ban for 100 years or unban
+            }
+        );
+
+        if (authError) throw authError;
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating user status:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deleteUser(userId: string) {
+    try {
+        // 1. Get current user session
+        const { createClient: createServerClient } = await import('@/lib/supabase/server');
+        const supabase = await createServerClient();
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+        if (!sessionUser) throw new Error('Unauthorized');
+
+        // 2. Verify Super Admin status
+        const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
+        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+            throw new Error('Unauthorized');
+        }
+
+        // 3. Delete from Auth (cascades to profiles and other tables)
+        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (authError) throw authError;
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting user:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateUserProfile(userId: string, data: { name: string; role: string; company_id?: string }) {
+    try {
+        // 1. Get current user session
+        const { createClient: createServerClient } = await import('@/lib/supabase/server');
+        const supabase = await createServerClient();
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+
+        if (!sessionUser) throw new Error('Unauthorized');
+
+        // 2. Verify Super Admin status
+        const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
+        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+            throw new Error('Unauthorized');
+        }
+
+        // 3. Update Auth User Metadata
+        const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+            userId,
+            {
+                user_metadata: {
+                    full_name: data.name,
+                    role: data.role,
+                    company_id: data.company_id
+                }
+            }
+        );
+
+        if (authError) throw authError;
+
+        // 4. Update Profile (trigger usually handles this, but let's be explicit)
+        const { error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+                full_name: data.name,
+                role: data.role as any,
+                company_id: data.company_id,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', userId);
+
+        if (profileError) throw profileError;
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating user profile:', error);
+        return { success: false, error: error.message };
+    }
+}
