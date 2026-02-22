@@ -48,7 +48,7 @@ export async function createCompanyWithAdmin(formData: any) {
         // 3. Profiles table is updated automatically by the trigger we created in migration!
 
         // 4. Send Welcome Email (Non-blocking)
-        emailService.sendCompanyWelcomeEmail(adminEmail, adminName, companyName).then(result => {
+        emailService.sendCompanyWelcomeEmail(adminEmail, adminName, companyName, adminPassword).then(result => {
             if (!result.success) {
                 console.error('Failed to send welcome email:', result.error);
             }
@@ -276,26 +276,27 @@ export async function updateCompany(companyId: string, data: { name: string, slu
 
 export async function resendWelcomeEmail(companyId: string) {
     try {
-        // 1. Get Company Details
-        const { data: company, error: compError } = await supabaseAdmin
+        // 1. Get the company
+        const { data: company, error: companyError } = await supabaseAdmin
             .from('companies')
             .select('name')
             .eq('id', companyId)
             .single();
 
-        if (compError) throw compError;
+        if (companyError) throw companyError;
 
-        // 2. Try to get Admin details from profiles table
-        let { data: profile, error: profError } = await supabaseAdmin
+        // 2. Identify the administrator
+        let { data: profile, error: profileError } = await supabaseAdmin
             .from('profiles')
-            .select('email, full_name')
+            .select('id, email, full_name')
             .eq('company_id', companyId)
             .eq('role', 'org_admin')
-            .order('created_at', { ascending: true })
-            .limit(1)
             .maybeSingle();
 
-        // 3. Self-healing: If no profile found, look in Supabase Auth
+        let authUser: any = null;
+
+        if (profileError) throw profileError;
+
         if (!profile) {
             console.log(`[resendWelcomeEmail] No profile found for company ${companyId}. Attempting self-healing...`);
 
@@ -303,7 +304,7 @@ export async function resendWelcomeEmail(companyId: string) {
             const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
             if (listError) throw listError;
 
-            const authUser = users.find(u =>
+            authUser = users.find(u =>
                 u.user_metadata?.company_id === companyId &&
                 u.user_metadata?.role === 'org_admin'
             );
@@ -324,23 +325,43 @@ export async function resendWelcomeEmail(companyId: string) {
                     role: 'org_admin',
                     company_id: companyId
                 })
-                .select('email, full_name')
+                .select('id, email, full_name')
                 .single();
 
             if (insertError) throw insertError;
             profile = newProfile;
             console.log(`[resendWelcomeEmail] Self-healing successful for ${profile.email}`);
+        } else {
+            // If profile was found, we still need the authUser to update their password
+            const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+            if (userError) throw userError;
+            authUser = user.user;
         }
 
-        if (!profile) {
-            throw new Error('No se encontró un administrador configurado para esta empresa.');
+        if (!profile || !authUser) {
+            throw new Error('No se pudo identificar un administrador válido.');
         }
 
-        // 4. Resend the email
+        // 3. Generate a new temporary password
+        const newPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
+
+        // 4. Update password in Supabase Auth
+        const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(
+            authUser.id,
+            {
+                password: newPassword,
+                user_metadata: { ...authUser.user_metadata, new_account: true } // Flag to force change
+            }
+        );
+
+        if (updateAuthError) throw updateAuthError;
+
+        // 5. Resend the email with the NEW password
         const emailResult = await emailService.sendCompanyWelcomeEmail(
             profile.email,
             profile.full_name || 'Administrador',
-            company.name
+            company.name,
+            newPassword
         );
 
         if (!emailResult.success) {
@@ -353,4 +374,3 @@ export async function resendWelcomeEmail(companyId: string) {
         return { success: false, error: error.message };
     }
 }
-

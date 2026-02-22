@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen, Clock } from 'lucide-react';
+import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen, Clock, Lock, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { updateCompanyBot, updateSupportEmail, updateBusinessHours } from '@/app/actions/admin';
+import { updatePassword } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
 
 const DAYS = [
@@ -45,10 +46,17 @@ export default function SettingsPage() {
     const [businessHours, setBusinessHours] = useState<any>(DEFAULT_HOURS);
     const [timezone, setTimezone] = useState('America/Bogota');
 
+    // Password State
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPasswords, setShowPasswords] = useState(false);
+    const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+
     useEffect(() => {
         async function loadData() {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
+                setNeedsPasswordChange(user.user_metadata?.new_account === true);
                 const { data: profileData } = await supabase
                     .from('profiles')
                     .select('*, companies(*)')
@@ -113,6 +121,32 @@ export default function SettingsPage() {
         setSaving(false);
     };
 
+    const handleUpdatePassword = async () => {
+        if (newPassword !== confirmPassword) {
+            setMessage({ type: 'error', text: 'Las contraseñas no coinciden.' });
+            return;
+        }
+        if (newPassword.length < 6) {
+            setMessage({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres.' });
+            return;
+        }
+
+        setSaving(true);
+        setMessage(null);
+
+        const result = await updatePassword(newPassword);
+
+        if (result.success) {
+            setMessage({ type: 'success', text: 'Contraseña actualizada con éxito.' });
+            setNewPassword('');
+            setConfirmPassword('');
+            setNeedsPasswordChange(false);
+        } else {
+            setMessage({ type: 'error', text: result.error || 'Error al actualizar la contraseña.' });
+        }
+        setSaving(false);
+    };
+
     const updateDay = (day: string, field: string, value: any) => {
         setBusinessHours((prev: any) => ({
             ...prev,
@@ -126,6 +160,22 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-5xl space-y-8 animate-in fade-in duration-500">
+            {needsPasswordChange && (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-2xl flex items-center gap-4 text-amber-500">
+                    <AlertCircle className="shrink-0" />
+                    <div>
+                        <p className="text-sm font-black">CAMBIO DE CLAVE REQUERIDO</p>
+                        <p className="text-xs opacity-80">Estás usando una clave temporal. Por seguridad, debes cambiarla ahora.</p>
+                    </div>
+                    <button
+                        onClick={() => setActiveTab('security')}
+                        className="ml-auto bg-amber-500 text-[#11131c] px-4 py-2 rounded-xl text-xs font-black hover:scale-105 transition-transform"
+                    >
+                        Cambiar Ahora
+                    </button>
+                </div>
+            )}
+
             <div>
                 <h1 className="text-3xl font-black text-white tracking-tight">Configuración</h1>
                 <p className="text-[#8b8fa3] mt-1">Gestiona tu perfil y las integraciones de tu empresa.</p>
@@ -162,7 +212,12 @@ export default function SettingsPage() {
                             />
                         </>
                     )}
-                    <TabItem icon={<Shield size={18} />} label="Seguridad" disabled />
+                    <TabItem
+                        icon={<Shield size={18} />}
+                        label="Seguridad"
+                        active={activeTab === 'security'}
+                        onClick={() => setActiveTab('security')}
+                    />
                 </div>
 
                 {/* Content Area */}
@@ -195,6 +250,82 @@ export default function SettingsPage() {
                                 </div>
                                 <button className="bg-[#2AABEE] text-white px-6 py-3 rounded-xl text-sm font-bold shadow-lg shadow-[#2AABEE]/20 hover:scale-105 transition-all">
                                     Guardar Perfil
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'security' && (
+                        <div className="bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] p-8 shadow-xl">
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Shield className="text-[#2AABEE]" />
+                                        Seguridad de la Cuenta
+                                    </h3>
+                                    <p className="text-sm text-[#8b8fa3] mt-2 max-w-md">
+                                        Cambia tu contraseña para mantener tu acceso seguro.
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-blue-500/10 rounded-2xl">
+                                    <Lock className="text-[#2AABEE]" size={32} />
+                                </div>
+                            </div>
+
+                            <div className="space-y-6">
+                                {needsPasswordChange && (
+                                    <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex gap-3 text-orange-500">
+                                        <AlertCircle className="shrink-0" size={20} />
+                                        <p className="text-xs font-bold leading-relaxed">
+                                            Tu administrador ha solicitado un cambio de contraseña. Por favor, elige una nueva clave segura.
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="relative">
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-[#4a4e5d] mb-2">Nueva Contraseña</label>
+                                        <input
+                                            type={showPasswords ? "text" : "password"}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="w-full bg-[#11131c] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-colors"
+                                        />
+                                        <button
+                                            onClick={() => setShowPasswords(!showPasswords)}
+                                            className="absolute right-4 top-[38px] text-[#4a4e5d] hover:text-[#2AABEE] transition-colors"
+                                        >
+                                            {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black uppercase tracking-widest text-[#4a4e5d] mb-2">Confirmar Contraseña</label>
+                                        <input
+                                            type={showPasswords ? "text" : "password"}
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            className="w-full bg-[#11131c] border border-[#2a2e3d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#2AABEE] transition-colors"
+                                        />
+                                    </div>
+                                </div>
+
+                                {message && (
+                                    <div className={cn(
+                                        "p-4 rounded-xl flex items-center gap-2 text-sm font-bold animate-in slide-in-from-top-2",
+                                        message.type === 'success' ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                                    )}>
+                                        {message.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                                        {message.text}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleUpdatePassword}
+                                    disabled={saving || !newPassword}
+                                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#2AABEE] disabled:bg-[#2AABEE]/50 text-white px-8 py-3 rounded-xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                >
+                                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
+                                    {saving ? 'Actualizando...' : 'Actualizar Contraseña'}
                                 </button>
                             </div>
                         </div>

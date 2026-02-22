@@ -75,7 +75,7 @@ export class EmailService {
     /**
      * Sends a welcome email to a new company administrator.
      */
-    async sendCompanyWelcomeEmail(to: string, adminName: string, companyName: string): Promise<{ success: boolean; error?: string }> {
+    async sendCompanyWelcomeEmail(to: string, adminName: string, companyName: string, password?: string): Promise<{ success: boolean; error?: string }> {
         if (!to) {
             console.error('EmailService: No target email provided.');
             return { success: false, error: 'No se proporcionó un destinatario.' };
@@ -83,6 +83,18 @@ export class EmailService {
 
         try {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-crm-ulmv.vercel.app';
+
+            const passwordSection = password ? `
+                <div style="background-color: #f1f5f9; border: 1px dashed #cbd5e1; padding: 25px; margin: 30px 0; border-radius: 12px; text-align: center;">
+                    <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Tus Credenciales de Acceso</p>
+                    <div style="display: inline-block; text-align: left; background: white; padding: 15px 25px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <p style="margin: 0; font-family: monospace; font-size: 14px; color: #1e293b;"><strong>Email:</strong> ${to}</p>
+                        <p style="margin: 5px 0 0 0; font-family: monospace; font-size: 14px; color: #1e293b;"><strong>Clave:</strong> <span style="background-color: #fef9c3; padding: 2px 6px; border-radius: 4px; border: 1px solid #fef08a;">${password}</span></p>
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; color: #ef4444; font-weight: bold;">* Se te pedirá cambiar esta clave al ingresar.</p>
+                </div>
+            ` : '';
+
             const info = await this.transporter.sendMail({
                 from: `"NexusCRM" <${process.env.GMAIL_USER}>`,
                 to: to,
@@ -100,6 +112,8 @@ export class EmailService {
                                 Es un placer darte la bienvenida a <strong>NexusCRM</strong>. Tu organización, <strong>${companyName}</strong>, ha sido creada con éxito en nuestra plataforma.
                             </p>
                             
+                            ${passwordSection}
+
                             <div style="background-color: #f8faff; border-left: 4px solid #2AABEE; padding: 20px; margin: 30px 0; border-radius: 8px;">
                                 <p style="margin: 0; font-size: 14px; color: #4a4e5d;">
                                     <strong>¿Qué sigue ahora?</strong><br>
