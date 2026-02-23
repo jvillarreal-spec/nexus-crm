@@ -205,12 +205,20 @@ export default function ChatContainer() {
     }, [selectedConversationId]);
 
     async function fetchConversationForContact(contactId: string) {
-        const { data: conversation, error } = await supabase
+        if (!profile) return;
+
+        let query = supabase
             .from('conversations')
             .select('id, summary, contacts(*)')
             .eq('contact_id', contactId)
-            .eq('status', 'open')
-            .maybeSingle();
+            .eq('status', 'open');
+
+        // Multi-tenancy filter
+        if (profile.role !== 'super_admin') {
+            query = query.eq('company_id', profile.company_id);
+        }
+
+        const { data: conversation, error } = await query.maybeSingle();
 
         if (conversation) {
             setSelectedConversationId(conversation.id);

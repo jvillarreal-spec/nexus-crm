@@ -22,12 +22,26 @@ const STATUS_TABS = [
 export default function ConversationList({ onSelect, selectedId }: ConversationListProps) {
     const [conversations, setConversations] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState('open');
+    const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const supabase = createClient();
 
     useEffect(() => {
-        fetchConversations();
+        async function init() {
+            setLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('company_id, role')
+                    .eq('id', user.id)
+                    .single();
+                setProfile(profileData);
+            }
+            fetchConversations();
+        }
+        init();
 
         // Subscribe to changes
         const channel = supabase
@@ -45,13 +59,32 @@ export default function ConversationList({ onSelect, selectedId }: ConversationL
     }, [activeTab]);
 
     async function fetchConversations() {
+        // We need the profile to filter by company_id
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profileData } = await supabase
+            .from('profiles')
+            .select('company_id, role')
+            .eq('id', user.id)
+            .single();
+
+        if (!profileData) return;
+
         setLoading(true);
         setError(null);
-        const { data, error } = await supabase
+
+        let query = supabase
             .from('conversations')
             .select('*, contacts(*), agent:profiles!conversations_assigned_to_fkey(full_name)')
-            .eq('status', activeTab)
-            .order('last_message_at', { ascending: false });
+            .eq('status', activeTab);
+
+        // Multi-tenancy filter: If not super_admin, filter by company_id
+        if (profileData.role !== 'super_admin') {
+            query = query.eq('company_id', profileData.company_id);
+        }
+
+        const { data, error } = await query.order('last_message_at', { ascending: false });
 
         if (error) {
             console.error('Error fetching conversations:', error);
