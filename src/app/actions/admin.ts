@@ -450,13 +450,27 @@ export async function updateUserStatus(userId: string, status: 'active' | 'inact
 
         if (!sessionUser) throw new Error('Unauthorized');
 
-        // 2. Verify Super Admin status
+        // 2. Get current user profile/metadata
         const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
-        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+        if (!currentUser) throw new Error('Unauthorized');
+
+        const userRole = currentUser.user_metadata.role;
+        const userCompanyId = currentUser.user_metadata.company_id;
+
+        // 3. Authorization Check
+        if (userRole !== 'super_admin' && userRole !== 'org_admin') {
             throw new Error('Unauthorized');
         }
 
-        // 3. Update Profile status
+        // If org_admin, verify the target user belongs to the same company
+        if (userRole === 'org_admin') {
+            const { data: { user: targetUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+            if (!targetUser || targetUser.user_metadata?.company_id !== userCompanyId) {
+                throw new Error('Unauthorized: You can only manage your own team.');
+            }
+        }
+
+        // 4. Update Profile status
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
             .update({ status, updated_at: new Date().toISOString() })
@@ -490,13 +504,27 @@ export async function deleteUser(userId: string) {
 
         if (!sessionUser) throw new Error('Unauthorized');
 
-        // 2. Verify Super Admin status
+        // 2. Get current user profile/metadata
         const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
-        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+        if (!currentUser) throw new Error('Unauthorized');
+
+        const userRole = currentUser.user_metadata.role;
+        const userCompanyId = currentUser.user_metadata.company_id;
+
+        // 3. Authorization Check
+        if (userRole !== 'super_admin' && userRole !== 'org_admin') {
             throw new Error('Unauthorized');
         }
 
-        // 3. Delete from Auth (cascades to profiles and other tables)
+        // If org_admin, verify the target user belongs to the same company
+        if (userRole === 'org_admin') {
+            const { data: { user: targetUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+            if (!targetUser || targetUser.user_metadata?.company_id !== userCompanyId) {
+                throw new Error('Unauthorized: You can only manage your own team.');
+            }
+        }
+
+        // 4. Delete from Auth (cascades to profiles and other tables)
         const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
         if (authError) throw authError;
 
@@ -516,10 +544,27 @@ export async function updateUserProfile(userId: string, data: { name: string; ro
 
         if (!sessionUser) throw new Error('Unauthorized');
 
-        // 2. Verify Super Admin status
+        // 2. Get current user profile/metadata
         const { data: { user: currentUser } } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
-        if (!currentUser || currentUser.user_metadata.role !== 'super_admin') {
+        if (!currentUser) throw new Error('Unauthorized');
+
+        const userRole = currentUser.user_metadata.role;
+        const userCompanyId = currentUser.user_metadata.company_id;
+
+        // 3. Authorization Check
+        if (userRole !== 'super_admin' && userRole !== 'org_admin') {
             throw new Error('Unauthorized');
+        }
+
+        // If org_admin, verify the target user belongs to the same company
+        if (userRole === 'org_admin') {
+            const { data: { user: targetUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+            if (!targetUser || targetUser.user_metadata?.company_id !== userCompanyId) {
+                throw new Error('Unauthorized: You can only manage your own team.');
+            }
+            // Ensure they don't change company_id or try to become super_admin
+            data.company_id = userCompanyId;
+            if (data.role === 'super_admin') data.role = 'agent';
         }
 
         // 3. Update Auth User Metadata
