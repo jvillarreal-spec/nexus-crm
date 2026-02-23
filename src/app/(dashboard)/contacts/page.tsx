@@ -14,11 +14,24 @@ export default function ContactsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedContact, setSelectedContact] = useState<any | null>(null);
+    const [profile, setProfile] = useState<any>(null);
     const supabase = createClient();
     const router = useRouter();
 
     useEffect(() => {
-        fetchContacts();
+        async function init() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('company_id, role')
+                    .eq('id', user.id)
+                    .single();
+                setProfile(profileData);
+                fetchContacts(profileData);
+            }
+        }
+        init();
 
         // Subscribe to real-time updates
         const channel = supabase
@@ -38,12 +51,24 @@ export default function ContactsPage() {
         };
     }, []);
 
-    async function fetchContacts() {
+    async function fetchContacts(profileData?: any) {
         setLoading(true);
-        const { data, error } = await supabase
+
+        const activeProfile = profileData || profile;
+        if (!activeProfile) {
+            setLoading(false);
+            return;
+        }
+
+        let query = supabase
             .from('contacts')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .select('*');
+
+        if (activeProfile.role !== 'super_admin') {
+            query = query.eq('company_id', activeProfile.company_id);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
             console.error('Error fetching contacts:', error);

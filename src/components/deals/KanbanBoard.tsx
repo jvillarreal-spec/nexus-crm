@@ -25,13 +25,22 @@ const STAGES = [
 export function KanbanBoard() {
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<any>(null);
     const supabase = createClient();
 
-    const fetchContacts = async () => {
-        const { data, error } = await supabase
+    const fetchContacts = async (profileData?: any) => {
+        const activeProfile = profileData || profile;
+        if (!activeProfile) return;
+
+        let query = supabase
             .from('contacts')
-            .select('*')
-            .order('updated_at', { ascending: false });
+            .select('*');
+
+        if (activeProfile.role !== 'super_admin') {
+            query = query.eq('company_id', activeProfile.company_id);
+        }
+
+        const { data, error } = await query.order('updated_at', { ascending: false });
 
         if (error) {
             console.error('Error fetching contacts for Kanban:', error);
@@ -49,7 +58,21 @@ export function KanbanBoard() {
     };
 
     useEffect(() => {
-        fetchContacts();
+        async function init() {
+            setLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('company_id, role')
+                    .eq('id', user.id)
+                    .single();
+                setProfile(profileData);
+                await fetchContacts(profileData);
+            }
+            setLoading(false);
+        }
+        init();
 
         // Subscribe to real-time changes
         const subscription = supabase

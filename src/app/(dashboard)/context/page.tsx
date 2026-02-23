@@ -9,18 +9,35 @@ export default function ContextPage() {
     const [content, setContent] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [profile, setProfile] = useState<any>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const supabase = createClient();
 
     useEffect(() => {
-        fetchContext();
+        async function init() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('company_id, role')
+                    .eq('id', user.id)
+                    .single();
+                setProfile(profileData);
+                fetchContext(profileData);
+            }
+        }
+        init();
     }, []);
 
-    const fetchContext = async () => {
+    const fetchContext = async (profileData?: any) => {
+        const activeProfile = profileData || profile;
+        if (!activeProfile) return;
+
         try {
             const { data, error } = await supabase
                 .from('organization_knowledge')
                 .select('content')
+                .eq('company_id', activeProfile.company_id)
                 .limit(1)
                 .maybeSingle();
 
@@ -37,6 +54,7 @@ export default function ContextPage() {
     };
 
     const handleSave = async () => {
+        if (!profile) return;
         setSaving(true);
         setMessage(null);
 
@@ -44,6 +62,7 @@ export default function ContextPage() {
             const { data: existing, error: fetchExistingError } = await supabase
                 .from('organization_knowledge')
                 .select('id')
+                .eq('company_id', profile.company_id)
                 .limit(1)
                 .maybeSingle();
 
@@ -62,7 +81,7 @@ export default function ContextPage() {
             } else {
                 const { error: insertError } = await supabase
                     .from('organization_knowledge')
-                    .insert({ content });
+                    .insert({ content, company_id: profile.company_id });
                 error = insertError;
             }
 
