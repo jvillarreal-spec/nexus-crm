@@ -200,8 +200,8 @@ export default function UsersPage() {
                 </div>
             )}
 
-            <div className="bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] overflow-hidden shadow-xl min-h-[400px]">
-                <div className="overflow-x-auto">
+            <div className="bg-[#1a1d27] border border-[#2a2e3d] rounded-[2rem] shadow-xl">
+                <div className="overflow-x-auto min-h-[400px]">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-[#11131c]">
@@ -276,7 +276,10 @@ export default function UsersPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right relative">
                                             <button
-                                                onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)}
+                                                onClick={() => {
+                                                    console.log('Toggle menu for:', member.id);
+                                                    setActiveMenuId(activeMenuId === member.id ? null : member.id);
+                                                }}
                                                 className="p-2 text-[#4a4e5d] hover:text-white transition-colors"
                                             >
                                                 <MoreVertical size={18} />
