@@ -199,6 +199,7 @@ export async function POST(request: NextRequest) {
                     const { data: knowledge } = await supabase
                         .from('organization_knowledge')
                         .select('content')
+                        .eq('company_id', companyId)
                         .limit(1)
                         .maybeSingle();
                     const businessContext = knowledge?.content || "";
