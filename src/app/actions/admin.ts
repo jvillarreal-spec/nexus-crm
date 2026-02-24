@@ -311,10 +311,16 @@ export async function resendWelcomeEmail(companyId: string, userId?: string) {
         }
 
         if (!profile) {
-            // Self-healing for Org Admin if not found in profiles (legacy)
-            if (!userId) {
-                console.log(`[resendWelcomeEmail] No profile found for company ${companyId}. Attempting self-healing...`);
-                // ... same auth list logic ...
+            console.log(`[resendWelcomeEmail] Target user ${userId || companyId} not found in profiles. Attempting self-healing...`);
+
+            if (userId) {
+                // Find specific user in Auth
+                const { data: { user: authUserFound }, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+                if (authUserError || !authUserFound) throw new Error('El usuario no existe en Auth.');
+
+                authUser = authUserFound;
+            } else {
+                // Fallback to Org Admin in Auth
                 const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
                 if (listError) throw listError;
 
@@ -322,32 +328,33 @@ export async function resendWelcomeEmail(companyId: string, userId?: string) {
                     u.user_metadata?.company_id === companyId &&
                     u.user_metadata?.role === 'org_admin'
                 );
-
-                if (!authUser) throw new Error('No se encontró un administrador para esta empresa.');
-
-                const { data: newProfile, error: insertError } = await supabaseAdmin
-                    .from('profiles')
-                    .insert({
-                        id: authUser.id,
-                        email: authUser.email,
-                        full_name: authUser.user_metadata?.full_name || 'Administrador',
-                        role: 'org_admin',
-                        company_id: companyId
-                    })
-                    .select('id, email, full_name')
-                    .single();
-
-                if (insertError) throw insertError;
-                profile = newProfile;
-            } else {
-                throw new Error('El usuario no existe.');
             }
-        }
 
-        // Get auth user info
-        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
-        if (userError) throw userError;
-        authUser = user;
+            if (!authUser) throw new Error('No se pudo encontrar al usuario solicitado.');
+
+            // Reparar perfil faltante
+            const { data: newProfile, error: insertError } = await supabaseAdmin
+                .from('profiles')
+                .insert({
+                    id: authUser.id,
+                    email: authUser.email,
+                    full_name: authUser.user_metadata?.full_name || (userId ? 'Comercial' : 'Administrador'),
+                    role: authUser.user_metadata?.role || (userId ? 'agent' : 'org_admin'),
+                    company_id: authUser.user_metadata?.company_id || companyId,
+                    status: 'active'
+                })
+                .select('id, email, full_name, role')
+                .single();
+
+            if (insertError) throw insertError;
+            profile = newProfile;
+            console.log(`[resendWelcomeEmail] Self-healing successful for ${profile.email}`);
+        } else {
+            // If profile was found, we still need the authUser to update their password
+            const { data: { user: u }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+            if (userError) throw userError;
+            authUser = u;
+        }
 
         if (!profile || !authUser) {
             throw new Error('No se pudo identificar un usuario válido.');
@@ -428,6 +435,8 @@ export async function createWorker(formData: { name: string; email: string }) {
         const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2).toUpperCase() + "!";
 
         // 4. Create user in Auth
+        let targetAuthUser: any = null;
+
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email,
             password: tempPassword,
@@ -440,7 +449,44 @@ export async function createWorker(formData: { name: string; email: string }) {
             }
         });
 
-        if (authError) throw authError;
+        if (authError) {
+            // Check if user already exists
+            if (authError.message.includes('already has been registered') || authError.status === 422) {
+                console.log(`[createWorker] User ${email} already exists. Attempting repair...`);
+                // Find the user by email
+                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+                if (listError) throw listError;
+
+                const existingUser = users.find(u => u.email === email);
+                if (!existingUser) throw new Error('Error al recuperar el usuario existente.');
+
+                targetAuthUser = existingUser;
+
+                // Update metadata to ensure company_id is set
+                await supabaseAdmin.auth.admin.updateUserById(targetAuthUser.id, {
+                    user_metadata: {
+                        full_name: name,
+                        role: 'agent',
+                        company_id: companyId
+                    }
+                });
+            } else {
+                throw authError;
+            }
+        } else {
+            targetAuthUser = authUser.user;
+        }
+
+        // 5. Manual Profile Sync (Defense in depth and repair)
+        await supabaseAdmin.from('profiles').upsert({
+            id: targetAuthUser.id,
+            email: targetAuthUser.email,
+            full_name: name,
+            role: 'agent',
+            company_id: companyId,
+            status: 'active',
+            updated_at: new Date().toISOString()
+        });
 
         // 5. Send welcome email
         const emailResult = await emailService.sendWorkerWelcomeEmail(
