@@ -202,7 +202,12 @@ export default function UsersPage() {
                 <div>
                     <h1 className="text-3xl font-black text-white tracking-tight">{pageTitle}</h1>
                     <p className="text-[#8b8fa3] mt-1">{pageDescription}</p>
-                    <button onClick={runDiagnosis} className="text-[8px] text-[#232732] hover:text-[#2AABEE]">.</button>
+                    <button
+                        onClick={runDiagnosis}
+                        className="text-[10px] font-bold text-[#2AABEE] hover:underline mt-2 flex items-center gap-1 opacity-50 hover:opacity-100 transition-all"
+                    >
+                        <Shield size={10} /> Soporte Técnico: Diagnosticar juancarevalos@live.com
+                    </button>
                 </div>
                 {diagInfo && (
                     <div className="bg-black/50 p-4 rounded-xl text-[10px] font-mono text-green-500 max-w-xs overflow-auto">
