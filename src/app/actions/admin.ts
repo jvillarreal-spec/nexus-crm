@@ -413,14 +413,18 @@ export async function createWorker(formData: { name: string; email: string }) {
 
         if (!sessionUser) throw new Error('Unauthorized');
 
-        // 2. Get full user metadata via Admin API to ensure we have company_id/role
-        const { data: { user: currentUser }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(sessionUser.id);
+        // 2. Get the admin's profile to get the correct company_id
+        const { data: adminProfile, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('company_id, role')
+            .eq('id', sessionUser.id)
+            .single();
 
-        if (!currentUser || (currentUser.user_metadata.role !== 'org_admin' && currentUser.user_metadata.role !== 'super_admin')) {
+        if (profileError || !adminProfile || (adminProfile.role !== 'org_admin' && adminProfile.role !== 'super_admin')) {
             throw new Error('Unauthorized');
         }
 
-        const companyId = currentUser.user_metadata.company_id;
+        const companyId = adminProfile.company_id;
 
         // 2. Get company name for the email
         const { data: company } = await supabaseAdmin
