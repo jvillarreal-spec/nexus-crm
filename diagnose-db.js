@@ -1,46 +1,43 @@
+import { createClient } from '@supabase/supabase-js';
 
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Manual .env.local parsing
-const envPath = path.resolve('.env.local');
-const envContent = fs.readFileSync(envPath, 'utf8');
-const env = {};
-envContent.split('\n').forEach(line => {
-    const [key, value] = line.split('=');
-    if (key && value) env[key.trim()] = value.trim();
-});
-
-const supabaseAdmin = createClient(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function diagnose() {
-    console.log("--- Supabase Diagnostics ---");
+    const emails = ['juancarevalos88888@gmail.com', 'juancarevalos@live.com'];
 
-    // 1. Check Profiles
-    const { data: profiles } = await supabaseAdmin.from('profiles').select('email, role, company_id');
-    console.log("\nProfiles:", JSON.stringify(profiles, null, 2));
+    console.log('--- DIAGNOSIS START ---');
 
-    // 2. Check Companies
-    const { data: companies } = await supabaseAdmin.from('companies').select('id, name, slug');
-    console.log("\nCompanies:", JSON.stringify(companies, null, 2));
+    for (const email of emails) {
+        console.log(`\nChecking: ${email}`);
 
-    // 3. Check Contacts Counts per Company
-    const { data: contactCounts } = await supabaseAdmin.from('contacts').select('company_id, assigned_to');
-    console.log("\nContacts Row Sample:", JSON.stringify(contactCounts?.slice(0, 5), null, 2));
-    console.log("Total Contacts:", contactCounts?.length);
+        // Check Auth
+        const { data: { users }, error: authError } = await supabase.auth.admin.listUsers();
+        const authUser = users.find(u => u.email === email);
 
-    // 4. Check Deals
-    const { data: deals } = await supabaseAdmin.from('deals').select('company_id, assigned_to, created_at');
-    console.log("\nDeals Sample:", JSON.stringify(deals?.slice(0, 5), null, 2));
-    console.log("Total Deals:", deals?.length);
+        if (authUser) {
+            console.log('Auth Metadata:', JSON.stringify(authUser.user_metadata, null, 2));
+        } else {
+            console.log('Auth: NOT FOUND');
+        }
 
-    // 5. Check Conversations
-    const { data: convs } = await supabaseAdmin.from('conversations').select('company_id, assigned_to');
-    console.log("\nConversations Total:", convs?.length);
+        // Check Profile
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (profile) {
+            console.log('Profile Table:', JSON.stringify(profile, null, 2));
+        } else {
+            console.log('Profile Table: NOT FOUND');
+        }
+    }
+
+    console.log('\n--- DIAGNOSIS END ---');
 }
 
 diagnose();

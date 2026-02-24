@@ -49,6 +49,10 @@ export default function UsersPage() {
     useEffect(() => {
         fetchUsers();
         fetchCompanies();
+        // Diagnostic
+        import('@/app/actions/admin').then(({ diagnoseAccount }) => {
+            diagnoseAccount('juancarevalos@live.com').then(res => console.log('DIAGNOSIS:', res));
+        });
     }, []);
 
     async function fetchCompanies() {
