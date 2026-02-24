@@ -20,10 +20,10 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import {
-    createWorker,
     updateUserStatus,
     deleteUser,
-    updateUserProfile
+    updateUserProfile,
+    resendWelcomeEmail
 } from '@/app/actions/admin';
 import { cn } from '@/lib/utils';
 
@@ -139,6 +139,19 @@ export default function UsersPage() {
             fetchUsers();
         } else {
             setMessage({ type: 'error', text: result.error || 'Error al eliminar el usuario.' });
+        }
+        setSaving(false);
+        setActiveMenuId(null);
+    };
+
+    const handleResendEmail = async (member: any) => {
+        setSaving(true);
+        const result = await resendWelcomeEmail(member.company_id, member.id);
+
+        if (result.success) {
+            setMessage({ type: 'success', text: `Correo de bienvenida reenviado a ${member.email}` });
+        } else {
+            setMessage({ type: 'error', text: result.error || 'Error al reenviar correo.' });
         }
         setSaving(false);
         setActiveMenuId(null);
@@ -302,6 +315,12 @@ export default function UsersPage() {
                                                     >
                                                         {member.status === 'inactive' ? <UserCheck size={14} /> : <Ban size={14} />}
                                                         {member.status === 'inactive' ? 'Activar' : 'Desactivar'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleResendEmail(member)}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-[#2AABEE] hover:bg-[#2AABEE]/10 transition-all"
+                                                    >
+                                                        <Mail size={14} /> Reenviar Bienvenida
                                                     </button>
                                                     <div className="h-px bg-[#2a2e3d] my-1" />
                                                     <button
