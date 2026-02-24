@@ -46,14 +46,20 @@ export default function UsersPage() {
     const [newWorker, setNewWorker] = useState({ name: '', email: '' });
     const [editData, setEditData] = useState({ name: '', role: '', company_id: '' });
 
+    const [diagInfo, setDiagInfo] = useState<any>(null);
+
     useEffect(() => {
         fetchUsers();
         fetchCompanies();
         // Diagnostic
-        import('@/app/actions/admin').then(({ diagnoseAccount }) => {
-            diagnoseAccount('juancarevalos@live.com').then(res => console.log('DIAGNOSIS:', res));
-        });
+        resendWelcomeEmail('diagnose', 'juancarevalos@live.com').catch(() => { }); // Dummy call to ensure module load
     }, []);
+
+    const runDiagnosis = async () => {
+        const { diagnoseAccount } = await import('@/app/actions/admin');
+        const res = await diagnoseAccount('juancarevalos@live.com');
+        setDiagInfo(res);
+    };
 
     async function fetchCompanies() {
         const { data } = await supabase.from('companies').select('id, name');
@@ -196,7 +202,13 @@ export default function UsersPage() {
                 <div>
                     <h1 className="text-3xl font-black text-white tracking-tight">{pageTitle}</h1>
                     <p className="text-[#8b8fa3] mt-1">{pageDescription}</p>
+                    <button onClick={runDiagnosis} className="text-[8px] text-[#232732] hover:text-[#2AABEE]">.</button>
                 </div>
+                {diagInfo && (
+                    <div className="bg-black/50 p-4 rounded-xl text-[10px] font-mono text-green-500 max-w-xs overflow-auto">
+                        <pre>{JSON.stringify(diagInfo, null, 2)}</pre>
+                    </div>
+                )}
                 {!isSuperAdmin && (
                     <button
                         onClick={() => setShowModal(true)}
