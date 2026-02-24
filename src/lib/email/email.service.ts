@@ -13,11 +13,17 @@ export class EmailService {
     private transporter;
 
     constructor() {
+        const user = process.env.GMAIL_USER;
+        const pass = process.env.GMAIL_APP_PASSWORD;
+
+        console.log('[EmailService] Initializing with user:', user ? `${user.substring(0, 3)}...` : 'MISSING');
+        console.log('[EmailService] App Password state:', pass ? 'PRESENT (Masked)' : 'MISSING');
+
         this.transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_APP_PASSWORD,
+                user: user,
+                pass: pass,
             },
         });
     }
@@ -156,6 +162,8 @@ export class EmailService {
         try {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-crm-ulmv.vercel.app';
 
+            console.log(`[EmailService] Attempting to send worker welcome email to: ${to} for company: ${companyName}`);
+
             const passwordSection = password ? `
                 <div style="background-color: #f1f5f9; border: 1px dashed #cbd5e1; padding: 25px; margin: 30px 0; border-radius: 12px; text-align: center;">
                     <p style="margin: 0 0 15px 0; font-size: 14px; color: #64748b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Tus Credenciales de Acceso</p>
@@ -167,7 +175,7 @@ export class EmailService {
                 </div>
             ` : '';
 
-            await this.transporter.sendMail({
+            const info = await this.transporter.sendMail({
                 from: `"NexusCRM" <${process.env.GMAIL_USER}>`,
                 to: to,
                 subject: `¡Te has unido al equipo de ${companyName} en NexusCRM!`,
@@ -185,18 +193,18 @@ export class EmailService {
                             </p>
                             
                             ${passwordSection}
-
+ 
                             <div style="background-color: #f8faff; border-left: 4px solid #2AABEE; padding: 20px; margin: 30px 0; border-radius: 8px;">
                                 <p style="margin: 0; font-size: 14px; color: #4a4e5d;">
                                     <strong>Comienza a atender a tus clientes</strong><br>
                                     Desde el panel podrás ver los chats de Telegram asignados a ti, responder mensajes y gestionar tus prospectos con ayuda de nuestra IA.
                                 </p>
                             </div>
-
+ 
                             <div style="text-align: center; margin-top: 40px;">
                                 <a href="${appUrl}/login" style="background-color: #2AABEE; color: #ffffff; padding: 18px 35px; border-radius: 12px; text-decoration: none; font-weight: bold; font-size: 16px; display: inline-block;">Ingresar al Panel</a>
                             </div>
-
+ 
                             <p style="margin-top: 40px; font-size: 14px; color: #8b8fa3; text-align: center;">
                                 Si tienes problemas para ingresar, contacta al administrador de tu empresa.
                             </p>
@@ -211,10 +219,11 @@ export class EmailService {
                 `
             });
 
+            console.log('[EmailService] Worker welcome email sent successfully:', info.messageId);
             return { success: true };
         } catch (error: any) {
-            console.error('EmailService Error:', error);
-            return { success: false, error: error.message };
+            console.error('[EmailService] Error sending worker welcome email:', error);
+            return { success: false, error: error.message || 'SMTP Error' };
         }
     }
 }

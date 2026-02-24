@@ -274,7 +274,7 @@ export async function updateCompany(companyId: string, data: { name: string, slu
     }
 }
 
-export async function resendWelcomeEmail(companyId: string) {
+export async function resendWelcomeEmail(companyId: string, userId?: string) {
     try {
         // 1. Get the company
         const { data: company, error: companyError } = await supabaseAdmin
@@ -285,61 +285,72 @@ export async function resendWelcomeEmail(companyId: string) {
 
         if (companyError) throw companyError;
 
-        // 2. Identify the administrator
-        let { data: profile, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email, full_name')
-            .eq('company_id', companyId)
-            .eq('role', 'org_admin')
-            .maybeSingle();
-
+        // 2. Identify the target user
+        let profile: any = null;
         let authUser: any = null;
 
-        if (profileError) throw profileError;
-
-        if (!profile) {
-            console.log(`[resendWelcomeEmail] No profile found for company ${companyId}. Attempting self-healing...`);
-
-            // List users from Auth to find the one assigned to this company as org_admin
-            const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-            if (listError) throw listError;
-
-            authUser = users.find(u =>
-                u.user_metadata?.company_id === companyId &&
-                u.user_metadata?.role === 'org_admin'
-            );
-
-            if (!authUser) {
-                throw new Error('No se encontró un administrador en el sistema de autenticación para esta empresa.');
-            }
-
-            console.log(`[resendWelcomeEmail] Found auth user ${authUser.id}. Re-creating profile...`);
-
-            // Re-create the missing profile
-            const { data: newProfile, error: insertError } = await supabaseAdmin
+        if (userId) {
+            // Target specific user
+            const { data: p, error: pe } = await supabaseAdmin
                 .from('profiles')
-                .insert({
-                    id: authUser.id,
-                    email: authUser.email,
-                    full_name: authUser.user_metadata?.full_name || 'Administrador',
-                    role: 'org_admin',
-                    company_id: companyId
-                })
-                .select('id, email, full_name')
+                .select('id, email, full_name, role')
+                .eq('id', userId)
                 .single();
-
-            if (insertError) throw insertError;
-            profile = newProfile;
-            console.log(`[resendWelcomeEmail] Self-healing successful for ${profile.email}`);
+            if (pe) throw pe;
+            profile = p;
         } else {
-            // If profile was found, we still need the authUser to update their password
-            const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
-            if (userError) throw userError;
-            authUser = user.user;
+            // Fallback to Org Admin
+            const { data: p, error: pe } = await supabaseAdmin
+                .from('profiles')
+                .select('id, email, full_name, role')
+                .eq('company_id', companyId)
+                .eq('role', 'org_admin')
+                .maybeSingle();
+            if (pe) throw pe;
+            profile = p;
         }
 
+        if (!profile) {
+            // Self-healing for Org Admin if not found in profiles (legacy)
+            if (!userId) {
+                console.log(`[resendWelcomeEmail] No profile found for company ${companyId}. Attempting self-healing...`);
+                // ... same auth list logic ...
+                const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+                if (listError) throw listError;
+
+                authUser = users.find(u =>
+                    u.user_metadata?.company_id === companyId &&
+                    u.user_metadata?.role === 'org_admin'
+                );
+
+                if (!authUser) throw new Error('No se encontró un administrador para esta empresa.');
+
+                const { data: newProfile, error: insertError } = await supabaseAdmin
+                    .from('profiles')
+                    .insert({
+                        id: authUser.id,
+                        email: authUser.email,
+                        full_name: authUser.user_metadata?.full_name || 'Administrador',
+                        role: 'org_admin',
+                        company_id: companyId
+                    })
+                    .select('id, email, full_name')
+                    .single();
+
+                if (insertError) throw insertError;
+                profile = newProfile;
+            } else {
+                throw new Error('El usuario no existe.');
+            }
+        }
+
+        // Get auth user info
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+        if (userError) throw userError;
+        authUser = user;
+
         if (!profile || !authUser) {
-            throw new Error('No se pudo identificar un administrador válido.');
+            throw new Error('No se pudo identificar un usuario válido.');
         }
 
         // 3. Generate a new temporary password
@@ -357,17 +368,26 @@ export async function resendWelcomeEmail(companyId: string) {
         if (updateAuthError) throw updateAuthError;
 
         // 5. Resend the email with the NEW password
-        const emailResult = await emailService.sendCompanyWelcomeEmail(
-            profile.email,
-            profile.full_name || 'Administrador',
-            company.name,
-            newPassword
-        );
+        const emailResult = profile.role === 'org_admin'
+            ? await emailService.sendCompanyWelcomeEmail(
+                profile.email,
+                profile.full_name || 'Administrador',
+                company.name,
+                newPassword
+            )
+            : await emailService.sendWorkerWelcomeEmail(
+                profile.email,
+                profile.full_name || 'Comercial',
+                company.name,
+                newPassword
+            );
 
         if (!emailResult.success) {
+            console.error(`[resendWelcomeEmail] Final fail: ${emailResult.error}`);
             throw new Error(`Resend Error: ${emailResult.error}`);
         }
 
+        console.log(`[resendWelcomeEmail] Success for ${profile.email}`);
         return { success: true };
     } catch (error: any) {
         console.error('Error resending welcome email:', error);
