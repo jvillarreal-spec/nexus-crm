@@ -204,9 +204,9 @@ export default function UsersPage() {
                     <p className="text-[#8b8fa3] mt-1">{pageDescription}</p>
                     <button
                         onClick={runDiagnosis}
-                        className="text-[10px] font-bold text-[#2AABEE] hover:underline mt-2 flex items-center gap-1 opacity-50 hover:opacity-100 transition-all"
+                        className="text-[12px] font-black bg-red-600 text-white px-3 py-1 rounded-full hover:bg-red-700 mt-2 flex items-center gap-1 shadow-lg animate-pulse"
                     >
-                        <Shield size={10} /> Soporte Técnico: Diagnosticar juancarevalos@live.com
+                        ⚠️ SOPORTE: CLIC AQUÍ PARA DIAGNOSTICAR
                     </button>
                 </div>
                 {diagInfo && (
