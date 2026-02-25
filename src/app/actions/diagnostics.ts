@@ -44,10 +44,50 @@ export async function diagnoseAccount(targetEmail: string) {
             targetInProfileAdmin: !!targetProfileAdmin,
             targetProfile: targetProfileAdmin,
             targetAuthCompanyId: targetAuth?.user_metadata?.company_id,
-            targetAuthMetadata: targetAuth?.user_metadata
+            targetAuthMetadata: targetAuth?.user_metadata,
+            targetEmail
         };
     } catch (error: any) {
         console.error('Diagnosis Error:', error);
         return { error: error.message };
+    }
+}
+
+export async function repairProfile(email: string) {
+    try {
+        console.log(`[repairProfile] Starting repair for ${email}...`);
+
+        // 1. Get Auth User
+        const { data: { users }, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+        if (authError) throw authError;
+
+        const user = users.find(u => u.email === email);
+        if (!user) throw new Error('Usuario no encontrado en la base de datos de autenticación.');
+
+        const metadata = user.user_metadata;
+        if (!metadata?.company_id) throw new Error('El usuario no tiene una empresa (company_id) asignada en sus metadatos.');
+
+        // 2. Perform Upsert
+        console.log(`[repairProfile] Attempting upsert for ${user.id} with company ${metadata.company_id}`);
+        const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
+            id: user.id,
+            email: user.email,
+            full_name: metadata.full_name || 'Nuevo Comercial',
+            role: metadata.role || 'agent',
+            company_id: metadata.company_id,
+            status: 'active',
+            updated_at: new Date().toISOString()
+        });
+
+        if (upsertError) {
+            console.error('[repairProfile] Upsert failed:', upsertError);
+            throw upsertError;
+        }
+
+        console.log(`[repairProfile] Success for ${email}`);
+        return { success: true };
+    } catch (error: any) {
+        console.error('[repairProfile] Final error:', error);
+        return { success: false, error: error.message || 'Error desconocido al reparar el perfil.' };
     }
 }

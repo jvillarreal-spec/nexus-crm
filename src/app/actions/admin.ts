@@ -482,7 +482,7 @@ export async function createWorker(formData: { name: string; email: string }) {
         }
 
         // 5. Manual Profile Sync (Defense in depth and repair)
-        await supabaseAdmin.from('profiles').upsert({
+        const { error: upsertError } = await supabaseAdmin.from('profiles').upsert({
             id: targetAuthUser.id,
             email: targetAuthUser.email,
             full_name: name,
@@ -491,6 +491,12 @@ export async function createWorker(formData: { name: string; email: string }) {
             status: 'active',
             updated_at: new Date().toISOString()
         });
+
+        if (upsertError) {
+            console.error('[createWorker] Profile upsert failed:', upsertError);
+            // We still proceed since the user is in Auth, but the return should reflect the partial success or failure
+            // return { success: false, error: 'User created in Auth but profile sync failed: ' + upsertError.message };
+        }
 
         // 5. Send welcome email
         const emailResult = await emailService.sendWorkerWelcomeEmail(
