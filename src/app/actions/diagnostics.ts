@@ -36,6 +36,13 @@ export async function diagnoseAccount(targetEmail: string) {
         // 4. Check Target in Profile (Admin Client - RLS bypassed)
         const { data: targetProfileAdmin } = await supabaseAdmin.from('profiles').select('*').eq('email', targetEmail).maybeSingle();
 
+        // 5. Check Company Bot Config
+        const { data: company } = await supabaseAdmin
+            .from('companies')
+            .select('*')
+            .eq('id', adminProfile?.company_id)
+            .single();
+
         return {
             success: true,
             adminCompanyId: adminProfile?.company_id,
@@ -45,7 +52,11 @@ export async function diagnoseAccount(targetEmail: string) {
             targetProfile: targetProfileAdmin,
             targetAuthCompanyId: targetAuth?.user_metadata?.company_id,
             targetAuthMetadata: targetAuth?.user_metadata,
-            targetEmail
+            targetEmail,
+            companyName: company?.name,
+            botTokenConfigured: !!company?.telegram_token,
+            botSecretConfigured: !!company?.telegram_secret_token,
+            expectedWebhook: company ? `https://nexus-crm-ulmv.vercel.app/api/webhooks/telegram/${company.id}` : null
         };
     } catch (error: any) {
         console.error('Diagnosis Error:', error);
