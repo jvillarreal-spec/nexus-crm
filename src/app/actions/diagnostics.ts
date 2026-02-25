@@ -30,15 +30,19 @@ export async function diagnoseAccount(targetEmail: string) {
 
         const targetAuth = users.find(u => u.email === targetEmail);
 
-        // 3. Check Target in Profile
-        const { data: targetProfile } = await supabase.from('profiles').select('*').eq('email', targetEmail).maybeSingle();
+        // 3. Check Target in Profile (User Client - RLS applies)
+        const { data: targetProfileUser } = await supabase.from('profiles').select('*').eq('email', targetEmail).maybeSingle();
+
+        // 4. Check Target in Profile (Admin Client - RLS bypassed)
+        const { data: targetProfileAdmin } = await supabaseAdmin.from('profiles').select('*').eq('email', targetEmail).maybeSingle();
 
         return {
             success: true,
             adminCompanyId: adminProfile?.company_id,
             adminRole: adminProfile?.role,
-            targetCompanyId: targetProfile?.company_id,
-            targetRole: targetProfile?.role,
+            targetInProfileUser: !!targetProfileUser,
+            targetInProfileAdmin: !!targetProfileAdmin,
+            targetProfile: targetProfileAdmin,
             targetAuthCompanyId: targetAuth?.user_metadata?.company_id,
             targetAuthMetadata: targetAuth?.user_metadata
         };
