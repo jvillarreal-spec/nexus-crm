@@ -50,6 +50,8 @@ export default function SettingsPage() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPasswords, setShowPasswords] = useState(false);
+    const [botDiagInfo, setBotDiagInfo] = useState<any>(null);
+    const [isDiagInProgress, setIsDiagInProgress] = useState(false);
     const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
 
     useEffect(() => {

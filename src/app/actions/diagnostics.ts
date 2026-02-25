@@ -101,3 +101,33 @@ export async function repairProfile(email: string) {
         return { success: false, error: error.message || 'Error desconocido al reparar el perfil.' };
     }
 }
+
+export async function getBotInfo(companyId: string) {
+    try {
+        const { data: company } = await supabaseAdmin
+            .from('companies')
+            .select('telegram_token, name')
+            .eq('id', companyId)
+            .single();
+
+        if (!company?.telegram_token) {
+            return { error: 'No hay token configurado para esta empresa.' };
+        }
+
+        const response = await fetch(`https://api.telegram.org/bot${company.telegram_token}/getWebhookInfo`);
+        const webhookInfo = await response.json();
+
+        const meResponse = await fetch(`https://api.telegram.org/bot${company.telegram_token}/getMe`);
+        const meInfo = await meResponse.json();
+
+        return {
+            success: true,
+            companyName: company.name,
+            botInfo: meInfo.result,
+            webhookInfo: webhookInfo.result
+        };
+    } catch (error: any) {
+        console.error('Error getting bot info:', error);
+        return { error: error.message };
+    }
+}
