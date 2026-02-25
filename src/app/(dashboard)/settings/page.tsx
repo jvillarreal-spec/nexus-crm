@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircle, AlertCircle, Loader2, BookOpen, Clock, Lock, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { updateCompanyBot, updateSupportEmail, updateBusinessHours } from '@/app/actions/admin';
+import { getBotInfo } from '@/app/actions/diagnostics';
 import { updatePassword } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
 
