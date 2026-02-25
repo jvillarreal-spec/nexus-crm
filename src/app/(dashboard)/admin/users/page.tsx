@@ -56,7 +56,7 @@ export default function UsersPage() {
     }, []);
 
     const runDiagnosis = async () => {
-        const { diagnoseAccount } = await import('@/app/actions/admin');
+        const { diagnoseAccount } = await import('@/app/actions/diagnostics');
         const res = await diagnoseAccount('juancarevalos@live.com');
         setDiagInfo(res);
     };
