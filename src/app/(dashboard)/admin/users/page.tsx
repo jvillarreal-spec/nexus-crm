@@ -202,38 +202,7 @@ export default function UsersPage() {
                 <div>
                     <h1 className="text-3xl font-black text-white tracking-tight">{pageTitle}</h1>
                     <p className="text-[#8b8fa3] mt-1">{pageDescription}</p>
-                    <button
-                        onClick={runDiagnosis}
-                        className="text-[12px] font-black bg-red-600 text-white px-3 py-1 rounded-full hover:bg-red-700 mt-2 flex items-center gap-1 shadow-lg animate-pulse"
-                    >
-                        ⚠️ SOPORTE: CLIC AQUÍ PARA DIAGNOSTICAR
-                    </button>
                 </div>
-                {diagInfo && (
-                    <div className="bg-black/50 p-4 rounded-xl text-[10px] font-mono text-green-500 max-w-xs overflow-auto border border-green-500/20">
-                        <pre>{JSON.stringify(diagInfo, null, 2)}</pre>
-                        {(!diagInfo.targetInProfileAdmin) && (
-                            <button
-                                onClick={async () => {
-                                    setSaving(true);
-                                    const { repairProfile } = await import('@/app/actions/diagnostics');
-                                    const res = await repairProfile(diagInfo.targetEmail);
-                                    if (res.success) {
-                                        setMessage({ type: 'success', text: '¡Perfil reparado con éxito! Recargando...' });
-                                        setTimeout(() => window.location.reload(), 2000);
-                                    } else {
-                                        setMessage({ type: 'error', text: res.error || 'Error al reparar.' });
-                                    }
-                                    setSaving(false);
-                                }}
-                                disabled={saving}
-                                className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg font-black hover:bg-green-700 w-full disabled:opacity-50"
-                            >
-                                {saving ? 'REPARANDO...' : '🛠️ REPARAR PERFIL AHORA'}
-                            </button>
-                        )}
-                    </div>
-                )}
                 {!isSuperAdmin && (
                     <button
                         onClick={() => setShowModal(true)}
