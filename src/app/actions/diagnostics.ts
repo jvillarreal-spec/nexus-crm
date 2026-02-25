@@ -36,7 +36,9 @@ export async function diagnoseAccount(targetEmail: string) {
         return {
             success: true,
             adminCompanyId: adminProfile?.company_id,
+            adminRole: adminProfile?.role,
             targetCompanyId: targetProfile?.company_id,
+            targetRole: targetProfile?.role,
             targetAuthCompanyId: targetAuth?.user_metadata?.company_id,
             targetAuthMetadata: targetAuth?.user_metadata
         };
