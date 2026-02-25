@@ -75,7 +75,6 @@ export async function repairProfile(email: string) {
             full_name: metadata.full_name || 'Nuevo Comercial',
             role: metadata.role || 'agent',
             company_id: metadata.company_id,
-            status: 'active',
             updated_at: new Date().toISOString()
         });
 

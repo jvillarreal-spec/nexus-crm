@@ -488,7 +488,6 @@ export async function createWorker(formData: { name: string; email: string }) {
             full_name: name,
             role: 'agent',
             company_id: companyId,
-            status: 'active',
             updated_at: new Date().toISOString()
         });
 
