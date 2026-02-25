@@ -5,6 +5,7 @@ import { Settings, User, Bell, Shield, Database, MessageCircle, Send, CheckCircl
 import { createClient } from '@/lib/supabase/client';
 import { updateCompanyBot, updateSupportEmail, updateBusinessHours } from '@/app/actions/admin';
 import { getBotInfo } from '@/app/actions/diagnostics';
+import { getBotInfo } from '@/app/actions/diagnostics';
 import { updatePassword } from '@/app/actions/auth';
 import { cn } from '@/lib/utils';
 
@@ -473,14 +474,76 @@ export default function SettingsPage() {
                                     </div>
                                 )}
 
-                                <button
-                                    onClick={handleSaveBot}
-                                    disabled={saving || !botToken}
-                                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#2AABEE] disabled:bg-[#2AABEE]/50 text-white px-8 py-3 rounded-xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                                >
-                                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                                    {saving ? 'Guardando...' : 'Guardar y Activar Bot'}
-                                </button>
+                                <div className="mt-8 flex items-center justify-between gap-4">
+                                    <button
+                                        onClick={handleSaveBot}
+                                        disabled={saving || !botToken}
+                                        className="flex-1 bg-[#2AABEE] text-white px-6 py-4 rounded-xl text-sm font-black shadow-lg shadow-[#2AABEE]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {saving ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                                        {saving ? 'Guardando...' : 'Guardar y Activar Bot'}
+                                    </button>
+
+                                    <button
+                                        onClick={async () => {
+                                            setIsDiagInProgress(true);
+                                            const res = await getBotInfo(profile?.company_id || '');
+                                            setBotDiagInfo(res);
+                                            setIsDiagInProgress(false);
+                                        }}
+                                        disabled={isDiagInProgress}
+                                        className="bg-red-600/10 border border-red-600/20 text-red-500 px-4 py-4 rounded-xl text-xs font-black hover:bg-red-600/20 transition-all flex items-center gap-2"
+                                    >
+                                        {isDiagInProgress ? <Loader2 className="animate-spin" size={16} /> : <AlertCircle size={16} />}
+                                        ⚠️ DIAGNOSTICAR BOT
+                                    </button>
+                                </div>
+
+                                {botDiagInfo && (
+                                    <div className="mt-6 p-6 bg-black/40 border border-[#2a2e3d] rounded-2xl space-y-4 animate-in slide-in-from-top-4 duration-300">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4a4e5d]">Resultado del Diagnóstico</h4>
+                                            <button onClick={() => setBotDiagInfo(null)} className="text-[10px] text-[#4a4e5d] hover:text-white">Cerrar</button>
+                                        </div>
+
+                                        {botDiagInfo.error ? (
+                                            <div className="text-red-500 text-xs font-bold bg-red-500/10 p-4 rounded-xl flex items-center gap-3">
+                                                <AlertCircle size={18} />
+                                                {botDiagInfo.error}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4 font-mono text-[10px]">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="bg-[#11131c] p-3 rounded-xl border border-[#2a2e3d]">
+                                                        <p className="text-[#4a4e5d] mb-1">BOT EN TELEGRAM</p>
+                                                        <p className="text-white font-bold">@{botDiagInfo.botInfo?.username || 'N/A'}</p>
+                                                        <p className="text-[#8b8fa3] mt-1">{botDiagInfo.botInfo?.first_name}</p>
+                                                    </div>
+                                                    <div className="bg-[#11131c] p-3 rounded-xl border border-[#2a2e3d]">
+                                                        <p className="text-[#4a4e5d] mb-1">PENDIENTES (UPDATES)</p>
+                                                        <p className={`font-bold ${botDiagInfo.webhookInfo?.pending_update_count > 0 ? 'text-amber-500' : 'text-green-500'}`}>
+                                                            {botDiagInfo.webhookInfo?.pending_update_count}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-[#11131c] p-3 rounded-xl border border-[#2a2e3d]">
+                                                    <p className="text-[#4a4e5d] mb-1">WEBHOOK REGISTRADO</p>
+                                                    <p className="text-blue-400 break-all">{botDiagInfo.webhookInfo?.url || 'NINGUNO'}</p>
+                                                    {botDiagInfo.webhookInfo?.last_error_message && (
+                                                        <p className="text-red-500 mt-2 p-2 bg-red-500/5 rounded-lg border border-red-500/10">
+                                                            Último Error: {botDiagInfo.webhookInfo.last_error_message}
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-[#4a4e5d] leading-relaxed text-[9px]">
+                                                    NOTA: Si el Webhook dice NINGUNO o muestra una URL vieja, vuelve a darle a "Guardar y Activar Bot" para refrescarlo.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
